@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { cache } from 'react'
+import { Suspense, cache } from 'react'
 import { Fredoka } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { GoogleAnalytics } from '@/components/analytics/google-analytics'
@@ -98,7 +98,9 @@ export default async function RootLayout({
         <Footer content={footerContent} />
         <JsonLd data={organizationSchema} />
         <Toaster />
-        <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? ''} />
+        <Suspense fallback={null}>
+          <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? ''} />
+        </Suspense>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
