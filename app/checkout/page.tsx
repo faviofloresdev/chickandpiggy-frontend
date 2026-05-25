@@ -308,11 +308,11 @@ export default function CheckoutPage() {
   const [paymentSession, setPaymentSession] = useState<CheckoutPaymentIntentResponse | null>(null)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [isLoadingPayment, setIsLoadingPayment] = useState(false)
-  const [persistedOrderId, setPersistedOrderId] = useState<number | null>(null)
-  const [persistedPaymentIntentId, setPersistedPaymentIntentId] = useState<string | null>(null)
   const [activeStep, setActiveStep] = useState<CheckoutStepId>('customer')
   const addressLine1InputRef = useRef<HTMLInputElement | null>(null)
   const autocompleteRef = useRef<any>(null)
+  const persistedOrderIdRef = useRef<number | null>(null)
+  const persistedPaymentIntentIdRef = useRef<string | null>(null)
   const completionRef = useRef({
     customer: false,
     address: false,
@@ -435,34 +435,34 @@ export default function CheckoutPage() {
     [appliedDiscountCode, items, safeShippingValues]
   )
 
-  const paymentRequestPayload = useMemo(
-    () =>
-      JSON.stringify({
-        items: buildCheckoutItemsPayload(items),
-        customer: customerValues,
-        shipping: {
-          addressLine1: safeShippingValues.addressLine1,
-          addressLine2: safeShippingValues.addressLine2,
-          city: safeShippingValues.city,
-          state: safeShippingValues.state,
-          postalCode: safeShippingValues.postalCode,
-          country: safeShippingValues.country,
-          selectedShippingOptionId: safeShippingValues.selectedShippingOptionId,
-        },
-        billing: {
-          addressLine1: safeShippingValues.addressLine1,
-          addressLine2: safeShippingValues.addressLine2,
-          city: safeShippingValues.city,
-          state: safeShippingValues.state,
-          postalCode: safeShippingValues.postalCode,
-          country: safeShippingValues.country,
-        },
-        ...(appliedDiscountCode ? { discountCode: appliedDiscountCode } : {}),
-        ...(persistedOrderId ? { orderId: persistedOrderId } : {}),
-        ...(persistedPaymentIntentId ? { paymentIntentId: persistedPaymentIntentId } : {}),
-      }),
-    [appliedDiscountCode, customerValues, items, persistedOrderId, persistedPaymentIntentId, safeShippingValues]
-  )
+  function buildPaymentRequestPayload() {
+    return JSON.stringify({
+      items: buildCheckoutItemsPayload(items),
+      customer: customerValues,
+      shipping: {
+        addressLine1: safeShippingValues.addressLine1,
+        addressLine2: safeShippingValues.addressLine2,
+        city: safeShippingValues.city,
+        state: safeShippingValues.state,
+        postalCode: safeShippingValues.postalCode,
+        country: safeShippingValues.country,
+        selectedShippingOptionId: safeShippingValues.selectedShippingOptionId,
+      },
+      billing: {
+        addressLine1: safeShippingValues.addressLine1,
+        addressLine2: safeShippingValues.addressLine2,
+        city: safeShippingValues.city,
+        state: safeShippingValues.state,
+        postalCode: safeShippingValues.postalCode,
+        country: safeShippingValues.country,
+      },
+      ...(appliedDiscountCode ? { discountCode: appliedDiscountCode } : {}),
+      ...(persistedOrderIdRef.current ? { orderId: persistedOrderIdRef.current } : {}),
+      ...(persistedPaymentIntentIdRef.current
+        ? { paymentIntentId: persistedPaymentIntentIdRef.current }
+        : {}),
+    })
+  }
 
   const availableShippingOptions =
     paymentSession?.shippingOptions?.length ? paymentSession.shippingOptions : quote?.shippingOptions ?? []
@@ -789,9 +789,16 @@ export default function CheckoutPage() {
   useEffect(() => {
     setPaymentSession(null)
     setPaymentError(null)
-    setPersistedOrderId(null)
-    setPersistedPaymentIntentId(null)
   }, [items, safeShippingValues.addressLine1, safeShippingValues.addressLine2, safeShippingValues.city, safeShippingValues.state, safeShippingValues.postalCode, safeShippingValues.country, safeShippingValues.selectedShippingOptionId, appliedDiscountCode])
+
+  useEffect(() => {
+    if (items.length > 0) {
+      return
+    }
+
+    persistedOrderIdRef.current = null
+    persistedPaymentIntentIdRef.current = null
+  }, [items.length])
 
   useEffect(() => {
     let isActive = true
@@ -918,7 +925,7 @@ export default function CheckoutPage() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: paymentRequestPayload,
+          body: buildPaymentRequestPayload(),
         })
 
         const payload = (await response.json()) as Record<string, unknown> & {
@@ -944,11 +951,11 @@ export default function CheckoutPage() {
         }
 
         setPaymentSession(nextPaymentSession)
-        if (nextPaymentSession.orderId && !persistedOrderId) {
-          setPersistedOrderId(nextPaymentSession.orderId)
+        if (nextPaymentSession.orderId) {
+          persistedOrderIdRef.current = nextPaymentSession.orderId
         }
-        if (nextPaymentSession.paymentIntentId && !persistedPaymentIntentId) {
-          setPersistedPaymentIntentId(nextPaymentSession.paymentIntentId)
+        if (nextPaymentSession.paymentIntentId) {
+          persistedPaymentIntentIdRef.current = nextPaymentSession.paymentIntentId
         }
         if (nextPaymentSession.discount) {
           setAppliedDiscount(nextPaymentSession.discount)
@@ -992,7 +999,7 @@ export default function CheckoutPage() {
         clearTimeout(timeoutId)
       }
     }
-  }, [canInitializePayment, items.length, paymentRequestPayload, persistedOrderId, persistedPaymentIntentId, quote])
+  }, [appliedDiscountCode, canInitializePayment, customerValues, items, quote, safeShippingValues])
 
   useEffect(() => {
     const previous = completionRef.current
