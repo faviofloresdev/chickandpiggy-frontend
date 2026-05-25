@@ -1,0 +1,17 @@
+export const BRAND_COLORS = {
+  brand50: '#FDFAF8',
+  brand75: '#FBF3EF',
+  brand100: '#F7DCCF',
+  brand150: '#F3E5EA',
+  brand200: '#E8CDE1',
+  brand300: '#D4EAFB',
+  brand350: '#CABAEC',
+  brand400: '#BEE0E0',
+  brand450: '#A6D0D0',
+  brand500: '#86BCBC',
+  brand600: '#6FA8A8',
+  brand700: '#7B7390',
+  brand800: '#535D70',
+  success50: '#E6F4EA',
+  success500: '#34A853',
+} as const
