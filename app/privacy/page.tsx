@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 import { RichText } from '@/components/content/rich-text'
-import { bffApi } from '@/lib/api/bff'
+import { strapiContentApi } from '@/lib/api/strapi'
 import { buildPageMetadata } from '@/lib/seo/metadata'
 
 export const revalidate = 300
@@ -14,7 +14,7 @@ export const metadata: Metadata = buildPageMetadata({
 })
 
 export default async function PrivacyPage() {
-  const footerContent = await bffApi.getFooter()
+  const footerContent = await strapiContentApi.getFooter().then((result) => result.data)
 
   return (
     <section className="mx-auto max-w-4xl px-6 py-16 md:px-12 md:py-24">

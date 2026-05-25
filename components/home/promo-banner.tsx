@@ -1,7 +1,7 @@
-import { bffApi } from '@/lib/api/bff'
+import { strapiContentApi } from '@/lib/api/strapi'
 
 export async function PromoBanner() {
-  const promoBanner = await bffApi.getPromoBanner()
+  const promoBanner = await strapiContentApi.getPromoBanner().then((result) => result.data)
   const promoTitle = typeof promoBanner.promoTitle === 'string' ? promoBanner.promoTitle.trim() : ''
 
   if (!promoBanner.promoActive || !promoTitle) {
