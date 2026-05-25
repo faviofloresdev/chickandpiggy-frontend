@@ -5,7 +5,7 @@ import { ChevronRight } from 'lucide-react'
 import { ProductCard } from '@/components/products/product-card'
 import { ShopProductConfigurator } from '@/components/products/shop-product-configurator'
 import { ShopSortForm } from '@/components/products/shop-sort-form'
-import { bffApi } from '@/lib/api/bff'
+import { strapiCatalogApi } from '@/lib/api/strapi'
 import type { Category, Product, ProductOptionGroup, ProductOptionValue } from '@/lib/api/contracts'
 import { buildPageMetadata } from '@/lib/seo/metadata'
 
@@ -329,8 +329,8 @@ export default async function ShopPage({
 }) {
   const resolvedSearchParams = await searchParams
   const [products, categories] = await Promise.all([
-    bffApi.getProducts(),
-    bffApi.getCategories(),
+    strapiCatalogApi.listProducts().then((result) => result.data),
+    strapiCatalogApi.listCategories().then((result) => result.data),
   ])
 
   const urlSearchParams = toUrlSearchParams(resolvedSearchParams)

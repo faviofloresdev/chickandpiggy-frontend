@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { FeaturedProductsGridClient } from '@/components/home/featured-products-grid-client'
-import { bffApi } from '@/lib/api/bff'
+import { strapiCatalogApi, strapiContentApi } from '@/lib/api/strapi'
 
 interface FeaturedProductsProps {
   showTitle?: boolean
@@ -12,9 +12,13 @@ export async function FeaturedProducts({
   showTitle = true,
   limit,
 }: FeaturedProductsProps) {
-  const featuredContent = await bffApi.getFeaturedProductContent()
+  const featuredContent = await strapiContentApi
+    .getFeaturedProductsContent()
+    .then((result) => result.data)
   const resolvedLimit = limit ?? featuredContent.featuredProductLimit
-  const displayProducts = await bffApi.getFeaturedProducts(resolvedLimit)
+  const displayProducts = await strapiCatalogApi
+    .listFeaturedProducts({ limit: resolvedLimit })
+    .then((result) => result.data)
 
   if (displayProducts.length === 0) {
     return (

@@ -7,7 +7,6 @@ import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { JsonLd } from '@/components/seo/json-ld'
 import { Toaster } from '@/components/ui/toaster'
-import { bffApi } from '@/lib/api/bff'
 import { env } from '@/lib/config/env'
 import { strapiContentApi } from '@/lib/api/strapi'
 import { buildOrganizationSchema } from '@/lib/seo/schema'
@@ -86,8 +85,8 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   const [headerContent, footerContent] = await Promise.all([
-    bffApi.getHeader(),
-    bffApi.getFooter(),
+    strapiContentApi.getHeader().then((result) => result.data),
+    strapiContentApi.getFooter().then((result) => result.data),
   ])
   const organizationSchema = buildOrganizationSchema(footerContent)
 
