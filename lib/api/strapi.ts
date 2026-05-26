@@ -1002,6 +1002,34 @@ function resolveDefaultFooterHref(label: string) {
   return undefined
 }
 
+function normalizeSocialHref(value: string) {
+  const href = value.trim()
+
+  if (!href || href === '#') {
+    return undefined
+  }
+
+  if (
+    href.startsWith('/') ||
+    href.startsWith('http://') ||
+    href.startsWith('https://') ||
+    href.startsWith('mailto:') ||
+    href.startsWith('tel:')
+  ) {
+    return href
+  }
+
+  if (href.startsWith('www.')) {
+    return `https://${href}`
+  }
+
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+([/?#].*)?$/i.test(href)) {
+    return `https://${href}`
+  }
+
+  return href
+}
+
 function normalizeFooterLink(entry: Record<string, unknown>, fallbackId: string): FooterLink | undefined {
   const labelCandidate =
     getAttribute(entry, 'label') ??
@@ -1039,13 +1067,28 @@ function normalizeFooterSocialLink(
 ): FooterSocialLink | undefined {
   const platformCandidate =
     getAttribute(entry, 'platform') ??
+    getAttribute(entry, 'icon') ??
+    getAttribute(entry, 'iconName') ??
+    getAttribute(entry, 'icon_name') ??
+    getAttribute(entry, 'network') ??
+    getAttribute(entry, 'socialNetwork') ??
+    getAttribute(entry, 'social_network') ??
+    getAttribute(entry, 'type') ??
     getAttribute(entry, 'label') ??
     getAttribute(entry, 'name') ??
     getAttribute(entry, 'title')
   const hrefCandidate =
     getAttribute(entry, 'href') ??
     getAttribute(entry, 'url') ??
-    getAttribute(entry, 'link')
+    getAttribute(entry, 'link') ??
+    getAttribute(entry, 'socialUrl') ??
+    getAttribute(entry, 'social_url')
+
+  const iconCandidate =
+    getAttribute(entry, 'icon') ??
+    getAttribute(entry, 'iconName') ??
+    getAttribute(entry, 'icon_name') ??
+    getAttribute(entry, 'platform')
 
   if (typeof platformCandidate !== 'string' || !platformCandidate.trim()) {
     return undefined
@@ -1055,10 +1098,17 @@ function normalizeFooterSocialLink(
     return undefined
   }
 
+  const href = normalizeSocialHref(hrefCandidate)
+
+  if (!href) {
+    return undefined
+  }
+
   return {
     id: String(getAttribute(entry, 'documentId') ?? getAttribute(entry, 'id') ?? fallbackId),
     platform: platformCandidate.trim(),
-    href: hrefCandidate.trim(),
+    href,
+    icon: typeof iconCandidate === 'string' && iconCandidate.trim() ? iconCandidate.trim() : undefined,
   }
 }
 
@@ -1104,6 +1154,56 @@ function normalizeRichTextNodes(value: unknown): RichTextNode[] {
   return value.filter((node): node is RichTextNode => Boolean(node && typeof node === 'object'))
 }
 
+function buildFooterSocialLinksFromDedicatedFields(entry: Record<string, unknown>): FooterSocialLink[] {
+  const dedicatedSocials = [
+    {
+      id: 'instagram',
+      platform: 'Instagram',
+      icon: 'instagram',
+      href: getAttribute(entry, 'footerInstagramLink') ?? getAttribute(entry, 'instagramLink'),
+    },
+    {
+      id: 'facebook',
+      platform: 'Facebook',
+      icon: 'facebook',
+      href: getAttribute(entry, 'footerFacebookLink') ?? getAttribute(entry, 'facebookLink'),
+    },
+    {
+      id: 'linkedin',
+      platform: 'LinkedIn',
+      icon: 'linkedin',
+      href: getAttribute(entry, 'footerLinkedinLink') ?? getAttribute(entry, 'linkedinLink'),
+    },
+    {
+      id: 'twitter',
+      platform: 'Twitter',
+      icon: 'twitter',
+      href: getAttribute(entry, 'footerTwitterLink') ?? getAttribute(entry, 'twitterLink'),
+    },
+  ]
+
+  return dedicatedSocials.flatMap((social) => {
+    if (typeof social.href !== 'string' || !social.href.trim()) {
+      return []
+    }
+
+    const href = normalizeSocialHref(social.href)
+
+    if (!href) {
+      return []
+    }
+
+    return [
+      {
+        id: social.id,
+        platform: social.platform,
+        href,
+        icon: social.icon,
+      },
+    ]
+  })
+}
+
 function normalizeFooter(entry: Record<string, unknown>): FooterContent {
   const linkGroupsSource =
     getAttribute(entry, 'linkGroups') ??
@@ -1115,6 +1215,12 @@ function normalizeFooter(entry: Record<string, unknown>): FooterContent {
   const socialLinksSource =
     getAttribute(entry, 'socialLinks') ??
     getAttribute(entry, 'social_links') ??
+    getAttribute(entry, 'socialMedia') ??
+    getAttribute(entry, 'social_media') ??
+    getAttribute(entry, 'socialMediaLinks') ??
+    getAttribute(entry, 'social_media_links') ??
+    getAttribute(entry, 'socialNetworks') ??
+    getAttribute(entry, 'social_networks') ??
     getAttribute(entry, 'socials') ??
     getAttribute(entry, 'redesSociales')
 
@@ -1131,6 +1237,7 @@ function normalizeFooter(entry: Record<string, unknown>): FooterContent {
   const socialLinks = asArray<Record<string, unknown>>(socialLinksSource)
     .map((social, index) => normalizeFooterSocialLink(social, `footer-social-${index}`))
     .filter((social): social is FooterSocialLink => Boolean(social))
+  const dedicatedSocialLinks = buildFooterSocialLinksFromDedicatedFields(entry)
 
   const bottomLinks = asArray<Record<string, unknown>>(bottomLinksSource)
     .map((link, index) => normalizeFooterLink(link, `footer-bottom-link-${index}`))
@@ -1140,12 +1247,14 @@ function normalizeFooter(entry: Record<string, unknown>): FooterContent {
     id: String(getAttribute(entry, 'documentId') ?? getAttribute(entry, 'id') ?? 'footer'),
     brandName: String(
       getAttribute(entry, 'brandName') ??
+        getAttribute(entry, 'footerBusinessName') ??
         getAttribute(entry, 'brand_name') ??
         getAttribute(entry, 'title') ??
         fallbackFooter.brandName
     ),
     description: String(
       getAttribute(entry, 'description') ??
+        getAttribute(entry, 'footerMessageUnderBusinessName') ??
         getAttribute(entry, 'subtitle') ??
         getAttribute(entry, 'tagline') ??
         fallbackFooter.description
@@ -1158,7 +1267,12 @@ function normalizeFooter(entry: Record<string, unknown>): FooterContent {
       typeof getAttribute(entry, 'phone') === 'string'
         ? String(getAttribute(entry, 'phone'))
         : fallbackFooter.phone,
-    socialLinks: socialLinks.length > 0 ? socialLinks : fallbackFooter.socialLinks,
+    socialLinks:
+      socialLinks.length > 0
+        ? socialLinks
+        : dedicatedSocialLinks.length > 0
+          ? dedicatedSocialLinks
+          : fallbackFooter.socialLinks,
     linkGroups: linkGroups.length > 0 ? linkGroups : fallbackFooter.linkGroups,
     copyrightText: String(
       getAttribute(entry, 'copyrightText') ??

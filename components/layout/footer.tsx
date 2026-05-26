@@ -11,12 +11,19 @@ function getSocialIcon(platform: string) {
     case 'instagram':
       return Instagram
     case 'linkedin':
+    case 'linked in':
       return Linkedin
     case 'twitter':
     case 'x':
+    case 'x-twitter':
       return Twitter
     case 'facebook':
+    case 'facebook-f':
       return Facebook
+    case 'globe':
+    case 'website':
+    case 'web':
+      return Globe
     default:
       return Globe
   }
@@ -57,7 +64,7 @@ export function Footer({ content }: FooterProps) {
           </div>
           <div className="flex gap-4 text-gray-400">
             {content.socialLinks.map((socialLink) => {
-              const SocialIcon = getSocialIcon(socialLink.platform)
+              const SocialIcon = getSocialIcon(socialLink.icon ?? socialLink.platform)
 
               return (
                 <a
