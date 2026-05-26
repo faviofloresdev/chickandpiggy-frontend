@@ -83,7 +83,7 @@ export function ContactPageClient({
             <div className="space-y-6">
               {contactInfo.contactEmail ? (
                 <div className="flex items-start gap-4 text-gray-600">
-                  <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center text-brand-500 shrink-0 shadow-sm">
+                  <div className="w-12 h-12 bg-brand-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm">
                     <Mail strokeWidth={1.5} />
                   </div>
                   <div className="pt-1">
@@ -100,7 +100,7 @@ export function ContactPageClient({
 
               {contactInfo.contactPhone ? (
                 <div className="flex items-start gap-4 text-gray-600">
-                  <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center text-brand-500 shrink-0 shadow-sm">
+                  <div className="w-12 h-12 bg-brand-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm">
                     <Phone strokeWidth={1.5} />
                   </div>
                   <div className="pt-1">
@@ -117,7 +117,7 @@ export function ContactPageClient({
 
               {contactInfo.contactWhatsapp ? (
                 <div className="flex items-start gap-4 text-gray-600">
-                  <div className="w-12 h-12 bg-success-50 rounded-full flex items-center justify-center text-success-500 shrink-0 shadow-sm">
+                  <div className="w-12 h-12 bg-brand-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm">
                     <MessageCircle strokeWidth={1.5} />
                   </div>
                   <div className="pt-1">

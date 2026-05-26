@@ -142,6 +142,7 @@ export interface FooterSocialLink {
   id: string
   platform: string
   href: string
+  icon?: string
 }
 
 export interface ContactInfo {
