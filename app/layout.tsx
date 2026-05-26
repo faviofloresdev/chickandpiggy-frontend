@@ -8,6 +8,7 @@ import { Footer } from '@/components/layout/footer'
 import { JsonLd } from '@/components/seo/json-ld'
 import { Toaster } from '@/components/ui/toaster'
 import { env } from '@/lib/config/env'
+import { bffApi } from '@/lib/api/bff'
 import { strapiContentApi } from '@/lib/api/strapi'
 import { buildOrganizationSchema } from '@/lib/seo/schema'
 import { BRAND_COLORS } from '@/lib/theme/brand'
@@ -86,7 +87,7 @@ export default async function RootLayout({
 }>) {
   const [headerContent, footerContent] = await Promise.all([
     strapiContentApi.getHeader().then((result) => result.data),
-    strapiContentApi.getFooter().then((result) => result.data),
+    bffApi.getFooter(),
   ])
   const organizationSchema = buildOrganizationSchema(footerContent)
 
