@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(env.strapiToken ? { Authorization: `Bearer ${env.strapiToken}` } : {}),
         ...(originHeader ? { Origin: originHeader } : {}),
       },
       body: JSON.stringify(payloadResult.data),
