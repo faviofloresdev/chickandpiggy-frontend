@@ -40,8 +40,8 @@ export default async function ThankYouPage({ searchParams }: ThankYouPageProps) 
       <ClearCartOnSuccess paymentReference={paymentReference} />
 
       <div className="mb-12 text-center">
-        <div className="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full bg-brand-100">
-          <Heart className="h-12 w-12 text-brand-500" fill="currentColor" />
+        <div className="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full bg-brand-500">
+          <Heart className="h-12 w-12 text-white" fill="currentColor" />
         </div>
         <h1 className="mb-4 text-4xl font-semibold tracking-tight text-brand-500">
           Thank you from the bottom of our hearts!
@@ -67,8 +67,8 @@ export default async function ThankYouPage({ searchParams }: ThankYouPageProps) 
 
         <div className="mb-8 space-y-6">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100">
-              <span className="font-semibold text-brand-500">1</span>
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-500">
+              <span className="font-semibold text-white">1</span>
             </div>
             <div>
               <h4 className="mb-1 font-medium text-gray-800">
@@ -80,8 +80,8 @@ export default async function ThankYouPage({ searchParams }: ThankYouPageProps) 
             </div>
           </div>
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100">
-              <span className="font-semibold text-brand-500">2</span>
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-500">
+              <span className="font-semibold text-white">2</span>
             </div>
             <div>
               <h4 className="mb-1 font-medium text-gray-800">
@@ -93,8 +93,8 @@ export default async function ThankYouPage({ searchParams }: ThankYouPageProps) 
             </div>
           </div>
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-success-50">
-              <Package className="h-5 w-5 text-success-500" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-500">
+              <Package className="h-5 w-5 text-white" />
             </div>
             <div>
               <h4 className="mb-1 font-medium text-gray-800">Shipping</h4>
