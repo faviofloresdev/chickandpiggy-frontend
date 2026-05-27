@@ -28,30 +28,31 @@ export function NewsletterSignup({ contactEmail }: NewsletterSignupProps) {
     setSubmitError(null)
 
     try {
-      const response = await fetch('/api/content/contact', {
+      const response = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          data: {
-            name: 'Newsletter subscriber',
-            email: trimmedEmail,
-            message: 'I want to subscribe to content updates and news from the homepage.',
-          },
+          email: trimmedEmail,
         }),
       })
 
       if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`)
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(payload?.error ?? `Request failed with status ${response.status}`)
       }
 
       setSubmitted(true)
       setEmail('')
     } catch (error) {
       console.error('Failed to submit newsletter signup', error)
-      setSubmitError('We could not save your subscription right now. Please try again in a moment.')
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'We could not save your subscription right now. Please try again in a moment.'
+      )
     } finally {
       setIsSubmitting(false)
     }
