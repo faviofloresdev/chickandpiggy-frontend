@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { env } from '@/lib/config/env'
-import { checkoutQuoteRequestSchema } from '@/lib/checkout/session'
+import { checkoutDiscountRequestSchema } from '@/lib/checkout/session'
 
 async function parseJsonResponse(response: Response) {
   const rawBody = await response.text()
@@ -23,24 +23,19 @@ export async function POST(request: Request) {
   try {
     const requestBody = await request.json()
     const originHeader = request.headers.get('origin')?.trim()
-    const payloadResult = checkoutQuoteRequestSchema.safeParse(requestBody)
+    const payloadResult = checkoutDiscountRequestSchema.safeParse(requestBody)
 
     if (!payloadResult.success) {
-      console.error('[checkout-quote] invalid payload', {
-        body: requestBody,
-        validationDetails: payloadResult.error.issues,
-      })
-
       return NextResponse.json(
         {
-          error: 'We could not process checkout.',
+          error: 'We could not apply the discount.',
         },
         { status: 400 }
       )
     }
 
-    const strapiQuoteUrl = new URL(env.strapiCheckoutQuotePath, `${env.strapiUrl}/`)
-    const response = await fetch(strapiQuoteUrl, {
+    const strapiDiscountUrl = new URL(env.strapiCheckoutDiscountPath, `${env.strapiUrl}/`)
+    const response = await fetch(strapiDiscountUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,32 +46,12 @@ export async function POST(request: Request) {
       cache: 'no-store',
     })
 
-    const payload = (await parseJsonResponse(response)) as {
-      totals?: unknown
-      shippingOptions?: unknown
-      originLabel?: string
-      error?: string
-      message?: string
-    }
+    const payload = await parseJsonResponse(response)
 
     if (!response.ok) {
-      console.error(
-        '[checkout-quote] strapi rejected payload',
-        JSON.stringify(
-          {
-            status: response.status,
-            originHeader,
-            requestBody: payloadResult.data,
-            responsePayload: payload,
-          },
-          null,
-          2
-        )
-      )
-
       return NextResponse.json(
         {
-          error: 'We could not process checkout.',
+          error: 'We could not apply the discount.',
         },
         { status: response.status || 500 }
       )
@@ -84,11 +59,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json(payload)
   } catch (error) {
-    console.error('[checkout-quote] failed to proxy request to Strapi', error)
+    console.error('[checkout-discount] failed to validate discount code', error)
 
     return NextResponse.json(
       {
-        error: 'We could not process checkout.',
+        error: 'We could not apply the discount.',
       },
       { status: 500 }
     )

@@ -51,6 +51,27 @@ function isColorOption(option: ProductOptionGroup) {
   return option.type === 'color'
 }
 
+function getSelectedOptionValueIds(
+  productOptions: ProductOptionGroup[],
+  selectedOptions: Record<string, string>
+) {
+  return productOptions.reduce<Record<string, string>>((acc, option) => {
+    const selectedValue = selectedOptions[option.type]
+
+    if (!selectedValue) {
+      return acc
+    }
+
+    const optionValue = option.values.find((value) => value.value === selectedValue)
+
+    if (optionValue?.id) {
+      acc[option.type] = optionValue.id
+    }
+
+    return acc
+  }, {})
+}
+
 interface ShopProductConfiguratorProps {
   product: Product
 }
@@ -82,6 +103,10 @@ export function ShopProductConfigurator({
   const canAddToCart =
     !requiresOptionSelection ||
     productOptions.every((option) => Boolean(selectedOptions[option.type]))
+  const selectedOptionValueIds = useMemo(
+    () => getSelectedOptionValueIds(productOptions, selectedOptions),
+    [productOptions, selectedOptions]
+  )
 
   const handleAddToCart = () => {
     addItem(
@@ -93,6 +118,7 @@ export function ShopProductConfigurator({
         selectedColor: selectedOptions.color,
         selectedSize: selectedOptions.size,
         selectedOptions,
+        selectedOptionValueIds,
       },
       quantity
     )
@@ -124,8 +150,8 @@ export function ShopProductConfigurator({
         </p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-        <div className="overflow-hidden rounded-[1.75rem] bg-brand-100">
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+        <div className="aspect-square overflow-hidden rounded-[1.75rem] bg-brand-100">
           <img
             src={displayImage}
             alt={product.name}
@@ -138,11 +164,6 @@ export function ShopProductConfigurator({
             <p className="text-3xl font-semibold text-brand-700">
               ${displayPrice.toFixed(2)}
             </p>
-            {product.description ? (
-              <p className="mt-3 max-w-2xl text-base leading-relaxed text-gray-600">
-                {product.description}
-              </p>
-            ) : null}
           </div>
 
           {productOptions.map((option) => (
@@ -260,6 +281,17 @@ export function ShopProductConfigurator({
           </button>
         </div>
       </div>
+
+      {product.description ? (
+        <div className="mt-8 rounded-[1.5rem] bg-white/70 p-5 md:p-6">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-700">
+            Description
+          </h3>
+          <div className="mt-3 max-w-3xl whitespace-pre-line text-base leading-relaxed text-gray-600">
+            {product.description}
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

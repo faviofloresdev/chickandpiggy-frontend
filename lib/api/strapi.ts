@@ -258,26 +258,36 @@ function extractRichText(source: unknown): string | undefined {
     return undefined
   }
 
+  function extractRichTextNode(node: unknown): string {
+    if (!node || typeof node !== 'object') {
+      return ''
+    }
+
+    if ('text' in node) {
+      return String((node as { text?: unknown }).text ?? '')
+    }
+
+    const { children, type } = node as { children?: unknown[]; type?: unknown }
+    const childText = Array.isArray(children)
+      ? children.map((child) => extractRichTextNode(child)).join('')
+      : ''
+    const normalizedText = childText.trim()
+
+    if (!normalizedText) {
+      return ''
+    }
+
+    if (type === 'list-item') {
+      return `- ${normalizedText}`
+    }
+
+    return normalizedText
+  }
+
   const text = source
-    .flatMap((node) => {
-      if (!node || typeof node !== 'object' || !('children' in node)) {
-        return []
-      }
-
-      const children = (node as { children?: unknown[] }).children
-      if (!Array.isArray(children)) {
-        return []
-      }
-
-      return children
-        .map((child) =>
-          child && typeof child === 'object' && 'text' in child
-            ? String((child as { text?: unknown }).text ?? '')
-            : ''
-        )
-        .filter(Boolean)
-    })
-    .join(' ')
+    .map((node) => extractRichTextNode(node))
+    .filter(Boolean)
+    .join('\n\n')
     .trim()
 
   return text || undefined
@@ -457,6 +467,16 @@ function buildProductOptions(entry: Record<string, unknown>): ProductOptionGroup
 
       if (!existingGroup.values.has(normalizedValue)) {
         existingGroup.values.set(normalizedValue, {
+          id:
+            getAttribute(optionValue, 'id') !== undefined
+              ? String(getAttribute(optionValue, 'id'))
+              : typeof getAttribute(optionValue, 'documentId') === 'string'
+                ? String(getAttribute(optionValue, 'documentId'))
+                : undefined,
+          documentId:
+            typeof getAttribute(optionValue, 'documentId') === 'string'
+              ? String(getAttribute(optionValue, 'documentId'))
+              : undefined,
           value: normalizedValue,
           label,
           hexColor:
@@ -520,6 +540,16 @@ function mergeProductOptionValues(
 
       if (!existingGroup.values.has(normalizedValue)) {
         existingGroup.values.set(normalizedValue, {
+          id:
+            getAttribute(optionValue, 'id') !== undefined
+              ? String(getAttribute(optionValue, 'id'))
+              : typeof getAttribute(optionValue, 'documentId') === 'string'
+                ? String(getAttribute(optionValue, 'documentId'))
+                : undefined,
+          documentId:
+            typeof getAttribute(optionValue, 'documentId') === 'string'
+              ? String(getAttribute(optionValue, 'documentId'))
+              : undefined,
           value: normalizedValue,
           label: classified.label,
           hexColor:
@@ -578,6 +608,16 @@ function normalizeProductVariantEntry(
     }
 
     optionEntries[classified.type] = {
+      id:
+        getAttribute(optionValue, 'id') !== undefined
+          ? String(getAttribute(optionValue, 'id'))
+          : typeof getAttribute(optionValue, 'documentId') === 'string'
+            ? String(getAttribute(optionValue, 'documentId'))
+            : undefined,
+      documentId:
+        typeof getAttribute(optionValue, 'documentId') === 'string'
+          ? String(getAttribute(optionValue, 'documentId'))
+          : undefined,
       value: classified.type === 'color' ? classified.value : classified.value,
       label: classified.label,
       hexColor:

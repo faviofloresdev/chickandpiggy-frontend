@@ -16,7 +16,10 @@ export const env = {
     'api/shipping-origins/active',
   strapiCheckoutQuotePath:
     normalizeUrl(process.env.STRAPI_CHECKOUT_QUOTE_PATH) ?? 'api/checkout/quote',
-  strapiDiscountPath: normalizeUrl(process.env.STRAPI_DISCOUNT_PATH) ?? 'api/discount',
+  strapiCheckoutDiscountPath:
+    normalizeUrl(process.env.STRAPI_CHECKOUT_DISCOUNT_PATH) ??
+    normalizeUrl(process.env.STRAPI_DISCOUNT_PATH) ??
+    'api/checkout/discount',
   strapiCheckoutPaymentIntentPath:
     normalizeUrl(process.env.STRAPI_CHECKOUT_PAYMENT_INTENT_PATH) ??
     normalizeUrl(process.env.STRAPI_STRIPE_CHECKOUT_PATH) ??

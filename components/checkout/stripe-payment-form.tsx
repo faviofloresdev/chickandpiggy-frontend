@@ -11,6 +11,11 @@ import {
 
 import { useCartStore } from '@/lib/store/cart-store'
 
+const STRIPE_PAYMENT_ERROR_MESSAGE =
+  'We could not confirm the payment right now. Please review your details and try again.'
+const STRIPE_PAYMENT_LOAD_ERROR_MESSAGE =
+  'We could not load the secure payment form right now. Please try again in a moment.'
+
 interface StripePaymentFormProps {
   amountLabel: string
   onLoadError?: (message: string) => void
@@ -46,7 +51,7 @@ export function StripePaymentForm({
     })
 
     if (result.error) {
-      setPaymentError(result.error.message ?? 'Unable to confirm the payment.')
+      setPaymentError(STRIPE_PAYMENT_ERROR_MESSAGE)
       setIsSubmitting(false)
       return
     }
@@ -69,8 +74,7 @@ export function StripePaymentForm({
             layout: 'tabs',
           }}
           onLoadError={(event) => {
-            const message =
-              event.error?.message ?? 'Unable to load the secure Stripe payment form.'
+            const message = STRIPE_PAYMENT_LOAD_ERROR_MESSAGE
             setPaymentError(message)
             onLoadError?.(message)
           }}

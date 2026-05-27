@@ -9,6 +9,24 @@ export interface CartItem extends Product {
   quantity: number
 }
 
+type PersistedCartItem = Pick<
+  CartItem,
+  | 'cartItemId'
+  | 'quantity'
+  | 'id'
+  | 'strapiId'
+  | 'documentId'
+  | 'slug'
+  | 'name'
+  | 'price'
+  | 'image'
+  | 'selectedVariantId'
+  | 'selectedColor'
+  | 'selectedSize'
+  | 'selectedOptions'
+  | 'selectedOptionValueIds'
+>
+
 interface CartState {
   items: CartItem[]
   addItem: (product: Product, quantity?: number) => void
@@ -40,14 +58,15 @@ export const useCartStore = create<CartState>()(
 
       addItem: (product: Product, quantity = 1) => {
         set((state) => {
-          const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : 1
+          const safeQuantity =
+            Number.isFinite(quantity) && quantity > 0 ? Math.min(99, Math.floor(quantity)) : 1
           const cartItemId = getCartItemId(product)
           const existingItem = state.items.find((item) => item.cartItemId === cartItemId)
           if (existingItem) {
             return {
               items: state.items.map((item) =>
                 item.cartItemId === cartItemId
-                  ? { ...item, quantity: item.quantity + safeQuantity }
+                  ? { ...item, quantity: Math.min(99, item.quantity + safeQuantity) }
                   : item
               ),
             }
@@ -65,13 +84,17 @@ export const useCartStore = create<CartState>()(
       },
 
       updateQuantity: (cartItemId: string, quantity: number) => {
-        if (quantity <= 0) {
+        const safeQuantity = Number.isFinite(quantity) ? Math.floor(quantity) : 0
+
+        if (safeQuantity <= 0) {
           get().removeItem(cartItemId)
           return
         }
         set((state) => ({
           items: state.items.map((item) =>
-            item.cartItemId === cartItemId ? { ...item, quantity } : item
+            item.cartItemId === cartItemId
+              ? { ...item, quantity: Math.min(99, safeQuantity) }
+              : item
           ),
         }))
       },
@@ -90,6 +113,24 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'chick-piggy-cart',
+      partialize: (state) => ({
+        items: state.items.map<PersistedCartItem>((item) => ({
+          cartItemId: item.cartItemId,
+          quantity: item.quantity,
+          id: item.id,
+          strapiId: item.strapiId,
+          documentId: item.documentId,
+          slug: item.slug,
+          name: item.name,
+          price: item.price,
+          image: item.image,
+          selectedVariantId: item.selectedVariantId,
+          selectedColor: item.selectedColor,
+          selectedSize: item.selectedSize,
+          selectedOptions: item.selectedOptions,
+          selectedOptionValueIds: item.selectedOptionValueIds,
+        })),
+      }),
     }
   )
 )

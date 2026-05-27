@@ -1,24 +1,7 @@
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 
 import { env } from '@/lib/config/env'
-import {
-  checkoutDiscountCodeSchema,
-  checkoutItemsSchema,
-} from '@/lib/checkout/session'
-
-const discountRequestSchema = z.object({
-  discountCode: checkoutDiscountCodeSchema,
-  items: checkoutItemsSchema.optional(),
-  shipping: z
-    .object({
-      city: z.string().trim().min(2, 'City is required.'),
-      state: z.string().trim().min(2, 'State is required.').max(3),
-      postalCode: z.string().trim().min(3, 'Postal code is required.').max(12),
-      country: z.string().trim().min(2, 'Country is required.').max(2),
-    })
-    .optional(),
-})
+import { checkoutDiscountRequestSchema } from '@/lib/checkout/session'
 
 async function parseJsonResponse(response: Response) {
   const rawBody = await response.text()
@@ -39,30 +22,25 @@ async function parseJsonResponse(response: Response) {
 export async function POST(request: Request) {
   try {
     const requestBody = await request.json()
-    const payloadResult = discountRequestSchema.safeParse(requestBody)
+    const originHeader = request.headers.get('origin')?.trim()
+    const payloadResult = checkoutDiscountRequestSchema.safeParse(requestBody)
 
     if (!payloadResult.success) {
-      const validationDetails = payloadResult.error.issues.map((issue) => ({
-        path: issue.path.join('.'),
-        message: issue.message,
-      }))
-
       return NextResponse.json(
         {
-          error: validationDetails[0]?.message ?? 'Please enter a valid discount code.',
-          details: validationDetails,
+          error: 'We could not apply the discount.',
         },
         { status: 400 }
       )
     }
 
-    const strapiDiscountUrl = new URL(env.strapiDiscountPath, `${env.strapiUrl}/`)
+    const strapiDiscountUrl = new URL(env.strapiCheckoutDiscountPath, `${env.strapiUrl}/`)
     const response = await fetch(strapiDiscountUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        ...(env.strapiToken ? { Authorization: `Bearer ${env.strapiToken}` } : {}),
+        ...(originHeader ? { Origin: originHeader } : {}),
       },
       body: JSON.stringify(payloadResult.data),
       cache: 'no-store',
@@ -73,13 +51,7 @@ export async function POST(request: Request) {
     if (!response.ok) {
       return NextResponse.json(
         {
-          error:
-            typeof payload.error === 'string'
-              ? payload.error
-              : typeof payload.message === 'string'
-                ? payload.message
-              : 'Unable to validate the discount code.',
-          details: payload.details,
+          error: 'We could not apply the discount.',
         },
         { status: response.status || 500 }
       )
@@ -91,10 +63,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Unable to validate the discount code.',
+        error: 'We could not apply the discount.',
       },
       { status: 500 }
     )

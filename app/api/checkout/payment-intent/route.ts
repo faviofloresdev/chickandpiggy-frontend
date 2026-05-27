@@ -21,11 +21,13 @@ async function parseJsonResponse(response: Response) {
 
 export async function POST(request: Request) {
   try {
-    const payloadResult = checkoutPaymentIntentRequestSchema.safeParse(await request.json())
+    const originHeader = request.headers.get('origin')?.trim()
+    const requestBody = await request.json()
+    const payloadResult = checkoutPaymentIntentRequestSchema.safeParse(requestBody)
 
     if (!payloadResult.success) {
       return NextResponse.json(
-        { error: 'Please complete checkout details before continuing.' },
+        { error: 'We could not process checkout.' },
         { status: 400 }
       )
     }
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        ...(env.strapiToken ? { Authorization: `Bearer ${env.strapiToken}` } : {}),
+        ...(originHeader ? { Origin: originHeader } : {}),
       },
       body: JSON.stringify(payloadResult.data),
       cache: 'no-store',
@@ -58,9 +60,23 @@ export async function POST(request: Request) {
     }
 
     if (!response.ok || !payload.clientSecret) {
+      console.error(
+        '[checkout-payment-intent] strapi rejected payload',
+        JSON.stringify(
+          {
+            status: response.status,
+            originHeader,
+            requestBody: payloadResult.success ? payloadResult.data : requestBody,
+            responsePayload: payload,
+          },
+          null,
+          2
+        )
+      )
+
       return NextResponse.json(
         {
-          error: payload.error ?? 'Unable to initialize Stripe payment form from Strapi.',
+          error: 'We could not process checkout.',
         },
         { status: response.status || 500 }
       )
@@ -81,10 +97,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Unable to initialize Stripe payment form.',
+        error: 'We could not process checkout.',
       },
       { status: 500 }
     )

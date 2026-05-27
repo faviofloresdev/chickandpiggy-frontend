@@ -40,6 +40,8 @@ export interface CheckoutQuoteResponse {
   shippingOptions: CheckoutShippingOption[]
   originLabel?: string
   discount?: CheckoutDiscount | null
+  checkoutSessionToken?: string
+  shippingFingerprint?: string
 }
 
 export interface CheckoutPaymentIntentResponse extends CheckoutQuoteResponse {

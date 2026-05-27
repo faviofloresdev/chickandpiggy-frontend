@@ -79,7 +79,7 @@ export function ProductCard({
             </div>
           ) : null}
           {showDescription && (
-            <p className="mt-2 text-base leading-relaxed text-gray-500">
+            <p className="mt-2 whitespace-pre-line text-base leading-relaxed text-gray-500">
               {product.description ?? 'Handcrafted soap made with natural ingredients for skin care.'}
             </p>
           )}
