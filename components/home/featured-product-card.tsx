@@ -46,12 +46,8 @@ export function FeaturedProductCard({
       <h3 className="text-xl font-medium tracking-tight text-brand-500 mb-2">
         {product.name}
       </h3>
-      <p className="text-sm font-semibold text-brand-700 mb-3">
-        ${product.price.toFixed(2)}
-      </p>
-      {product.description ? (
-        <p className="text-base text-gray-500 leading-relaxed">{product.description}</p>
-      ) : null}
+      <p className="sr-only">Price: ${product.price.toFixed(2)}</p>
+      {product.description ? <p className="sr-only">{product.description}</p> : null}
     </Link>
   )
 }
