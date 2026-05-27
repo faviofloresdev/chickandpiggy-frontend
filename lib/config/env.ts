@@ -24,6 +24,9 @@ export const env = {
     normalizeUrl(process.env.STRAPI_CHECKOUT_PAYMENT_INTENT_PATH) ??
     normalizeUrl(process.env.STRAPI_STRIPE_CHECKOUT_PATH) ??
     'api/checkout/payment-intent',
+  strapiNewsletterSubscriptionPath:
+    normalizeUrl(process.env.STRAPI_NEWSLETTER_SUBSCRIPTION_PATH) ??
+    'api/newsletter-subscriptions',
   strapiStripeCheckoutPath:
     normalizeUrl(process.env.STRAPI_STRIPE_CHECKOUT_PATH) ?? 'api/stripe/checkout',
 }
