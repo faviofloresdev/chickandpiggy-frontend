@@ -46,6 +46,28 @@ type CheckoutFormValues = z.infer<typeof checkoutFormSchema>
 type CheckoutStepId = 'customer' | 'address' | 'shipping' | 'payment'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+const INVALID_CART_MESSAGE =
+  'Your cart contains an item we could not verify. Remove it and add it again before checking out.'
+const CHECKOUT_ERROR_MESSAGE = 'We could not process checkout.'
+const CART_CHANGED_ERROR_MESSAGE = 'Your cart changed. Please try again.'
+const DISCOUNT_ERROR_MESSAGE = 'We could not apply the discount.'
+const RATE_LIMIT_ERROR_MESSAGE = 'Too many requests. Please try again in a few minutes.'
+
+function getPublicRequestError(
+  status: number,
+  fallbackMessage: string,
+  cartChangedMessage = CART_CHANGED_ERROR_MESSAGE
+) {
+  if (status === 429) {
+    return RATE_LIMIT_ERROR_MESSAGE
+  }
+
+  if ([400, 409, 410, 422].includes(status)) {
+    return cartChangedMessage
+  }
+
+  return fallbackMessage
+}
 
 function formatSelectedOptions(item: {
   selectedOptions?: Record<string, string>
@@ -267,6 +289,14 @@ function parseQuoteResponse(payload: Record<string, unknown>): CheckoutQuoteResp
     shippingOptions,
     originLabel: typeof payload.originLabel === 'string' ? payload.originLabel : undefined,
     discount: parseDiscount(payload),
+    checkoutSessionToken:
+      typeof payload.checkoutSessionToken === 'string'
+        ? payload.checkoutSessionToken
+        : undefined,
+    shippingFingerprint:
+      typeof payload.shippingFingerprint === 'string'
+        ? payload.shippingFingerprint
+        : undefined,
   }
 }
 
@@ -290,12 +320,22 @@ function parsePaymentIntentResponse(
   }
 }
 
+function buildCheckoutShippingAddressPayload(shipping: CheckoutFormValues['shipping']) {
+  return {
+    addressLine1: shipping.addressLine1,
+    ...(shipping.addressLine2?.trim() ? { addressLine2: shipping.addressLine2 } : {}),
+    city: shipping.city,
+    state: shipping.state,
+    postalCode: shipping.postalCode,
+    country: shipping.country,
+  }
+}
+
 export default function CheckoutPage() {
   const { items, getSubtotal } = useCartStore()
   const [googleStatus, setGoogleStatus] = useState<
     'loading' | 'ready' | 'unavailable' | 'error'
   >(GOOGLE_MAPS_API_KEY ? 'loading' : 'unavailable')
-  const [activeOriginLabel, setActiveOriginLabel] = useState<string | null>(null)
   const [quote, setQuote] = useState<CheckoutQuoteResponse | null>(null)
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const [isLoadingQuote, setIsLoadingQuote] = useState(false)
@@ -402,17 +442,26 @@ export default function CheckoutPage() {
     safeShippingValues.postalCode,
     safeShippingValues.country,
   ]
+  const checkoutItemsPayload = useMemo(() => buildCheckoutItemsPayload(items), [items])
+  const hasInvalidCartItems = checkoutItemsPayload.length !== items.length
+  const cartIntegrityError = hasInvalidCartItems ? INVALID_CART_MESSAGE : null
+  const checkoutSessionToken = quote?.checkoutSessionToken?.trim() ?? ''
   const canRequestQuote =
-    items.length > 0 &&
+    checkoutItemsPayload.length > 0 &&
+    !hasInvalidCartItems &&
     manualLocationFields.every((value) => value.trim().length > 0) &&
     (!usesGoogleManagedAddress || !!addressValidated)
   const canInitializePayment =
+    !hasInvalidCartItems &&
     form.formState.isValid &&
     !!selectedShippingOptionId &&
     !!quote &&
+    !!checkoutSessionToken &&
     (!usesGoogleManagedAddress || !!addressValidated)
   const canApplyDiscount =
-    items.length > 0 &&
+    checkoutItemsPayload.length > 0 &&
+    !hasInvalidCartItems &&
+    !!checkoutSessionToken &&
     [safeShippingValues.city, safeShippingValues.state, safeShippingValues.postalCode, safeShippingValues.country].every(
       (value) => value.trim().length > 0
     )
@@ -420,43 +469,23 @@ export default function CheckoutPage() {
   const quoteRequestPayload = useMemo(
     () =>
       JSON.stringify({
-        items: buildCheckoutItemsPayload(items),
-        shipping: {
-          addressLine1: safeShippingValues.addressLine1,
-          addressLine2: safeShippingValues.addressLine2,
-          city: safeShippingValues.city,
-          state: safeShippingValues.state,
-          postalCode: safeShippingValues.postalCode,
-          country: safeShippingValues.country,
-          googleValidatedAddress: safeShippingValues.googleValidatedAddress,
-        },
-        ...(appliedDiscountCode ? { discountCode: appliedDiscountCode } : {}),
+        items: checkoutItemsPayload,
+        shipping: buildCheckoutShippingAddressPayload(safeShippingValues),
       }),
-    [appliedDiscountCode, items, safeShippingValues]
+    [checkoutItemsPayload, safeShippingValues]
   )
 
   function buildPaymentRequestPayload() {
     return JSON.stringify({
-      items: buildCheckoutItemsPayload(items),
+      items: checkoutItemsPayload,
       customer: customerValues,
       shipping: {
-        addressLine1: safeShippingValues.addressLine1,
-        addressLine2: safeShippingValues.addressLine2,
-        city: safeShippingValues.city,
-        state: safeShippingValues.state,
-        postalCode: safeShippingValues.postalCode,
-        country: safeShippingValues.country,
+        ...buildCheckoutShippingAddressPayload(safeShippingValues),
         selectedShippingOptionId: safeShippingValues.selectedShippingOptionId,
       },
-      billing: {
-        addressLine1: safeShippingValues.addressLine1,
-        addressLine2: safeShippingValues.addressLine2,
-        city: safeShippingValues.city,
-        state: safeShippingValues.state,
-        postalCode: safeShippingValues.postalCode,
-        country: safeShippingValues.country,
-      },
+      billing: buildCheckoutShippingAddressPayload(safeShippingValues),
       ...(appliedDiscountCode ? { discountCode: appliedDiscountCode } : {}),
+      checkoutSessionToken,
       ...(persistedOrderIdRef.current ? { orderId: persistedOrderIdRef.current } : {}),
       ...(persistedPaymentIntentIdRef.current
         ? { paymentIntentId: persistedPaymentIntentIdRef.current }
@@ -489,7 +518,7 @@ export default function CheckoutPage() {
   const total = displayTotals
     ? Number((subtotal - discountAmount + shippingAmount + tax).toFixed(2))
     : subtotal
-  const originLabel = activeOriginLabel?.trim() || quote?.originLabel?.trim() || ''
+  const originLabel = quote?.originLabel?.trim() || ''
   const paymentAmountLabel = displayTotals ? `$${total.toFixed(2)}` : '$0.00'
   const customerComplete =
     !!customerValues?.name?.trim() &&
@@ -552,16 +581,15 @@ export default function CheckoutPage() {
     const nextCode = discountCode.trim()
 
     if (!nextCode) {
-      setDiscountError('Enter a discount code to validate it.')
+      setDiscountError(DISCOUNT_ERROR_MESSAGE)
       setDiscountSuccessMessage(null)
       setAppliedDiscount(null)
+      setAppliedDiscountCode(null)
       return
     }
 
     if (!canApplyDiscount) {
-      setDiscountError(
-        'Complete city, state, postal code, and country before applying a discount code.'
-      )
+      setDiscountError(CART_CHANGED_ERROR_MESSAGE)
       setDiscountSuccessMessage(null)
       return
     }
@@ -571,20 +599,16 @@ export default function CheckoutPage() {
     setDiscountSuccessMessage(null)
 
     try {
-      const response = await fetch('/api/discount', {
+      const response = await fetch('/api/checkout/discount', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          items: checkoutItemsPayload,
+          shipping: buildCheckoutShippingAddressPayload(safeShippingValues),
           discountCode: nextCode,
-          items: buildCheckoutItemsPayload(items),
-          shipping: {
-            city: safeShippingValues.city,
-            state: safeShippingValues.state,
-            postalCode: safeShippingValues.postalCode,
-            country: safeShippingValues.country,
-          },
+          checkoutSessionToken,
         }),
       })
 
@@ -592,31 +616,41 @@ export default function CheckoutPage() {
 
       if (!response.ok) {
         throw new Error(
-          typeof payload.error === 'string'
-            ? payload.error
-            : typeof payload.message === 'string'
-              ? payload.message
-              : 'The discount code is not valid.'
+          getPublicRequestError(response.status, DISCOUNT_ERROR_MESSAGE, DISCOUNT_ERROR_MESSAGE)
         )
       }
 
       const parsedDiscount = parseDiscount(payload)
+      const parsedQuote = parseQuoteResponse(payload)
+
+      if (parsedQuote?.totals) {
+        setQuote((current) =>
+          current
+            ? {
+                ...current,
+                ...parsedQuote,
+                checkoutSessionToken: current.checkoutSessionToken,
+                shippingFingerprint:
+                  parsedQuote.shippingFingerprint ?? current.shippingFingerprint,
+              }
+            : current
+        )
+      }
 
       setAppliedDiscount(parsedDiscount ?? { code: nextCode, amount: 0 })
       setAppliedDiscountCode(parsedDiscount?.code ?? nextCode)
       setDiscountCode(parsedDiscount?.code ?? nextCode)
       setDiscountSuccessMessage(
-        typeof payload.message === 'string'
-          ? payload.message
-          : parsedDiscount?.amount
-            ? 'Discount code applied successfully.'
-            : 'Discount code validated successfully.'
+        parsedDiscount?.amount
+          ? 'Discount code applied successfully.'
+          : 'Discount code validated successfully.'
       )
     } catch (error) {
       setAppliedDiscount(null)
+      setAppliedDiscountCode(null)
       setDiscountSuccessMessage(null)
       setDiscountError(
-        error instanceof Error ? error.message : 'Unable to validate the discount code.'
+        error instanceof Error ? error.message : DISCOUNT_ERROR_MESSAGE
       )
     } finally {
       setIsApplyingDiscount(false)
@@ -630,41 +664,6 @@ export default function CheckoutPage() {
     setDiscountError(null)
     setDiscountSuccessMessage(null)
   }
-
-  useEffect(() => {
-    let isActive = true
-
-    async function loadActiveOrigin() {
-      try {
-        const response = await fetch('/api/shipping-origins/active', {
-          cache: 'no-store',
-        })
-        const payload = (await response.json()) as {
-          originLabel?: string
-        }
-
-        if (!response.ok) {
-          return
-        }
-
-        if (!isActive) {
-          return
-        }
-
-        setActiveOriginLabel(payload.originLabel?.trim() || null)
-      } catch {
-        if (isActive) {
-          setActiveOriginLabel(null)
-        }
-      }
-    }
-
-    void loadActiveOrigin()
-
-    return () => {
-      isActive = false
-    }
-  }, [])
 
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY) {
@@ -789,7 +788,18 @@ export default function CheckoutPage() {
   useEffect(() => {
     setPaymentSession(null)
     setPaymentError(null)
-  }, [items, safeShippingValues.addressLine1, safeShippingValues.addressLine2, safeShippingValues.city, safeShippingValues.state, safeShippingValues.postalCode, safeShippingValues.country, safeShippingValues.selectedShippingOptionId, appliedDiscountCode])
+  }, [selectedShippingOptionId, appliedDiscountCode, customerValues, checkoutSessionToken])
+
+  useEffect(() => {
+    setQuote(null)
+    setQuoteError(null)
+    setPaymentSession(null)
+    setPaymentError(null)
+    setAppliedDiscount(null)
+    setDiscountSuccessMessage(null)
+    persistedOrderIdRef.current = null
+    persistedPaymentIntentIdRef.current = null
+  }, [quoteRequestPayload])
 
   useEffect(() => {
     if (items.length > 0) {
@@ -823,25 +833,13 @@ export default function CheckoutPage() {
         }
 
         if (!response.ok) {
-          const detailsMessage =
-            payload.details && payload.details.length > 0
-              ? payload.details
-                  .map((detail) =>
-                    detail.path ? `${detail.path}: ${detail.message}` : detail.message
-                  )
-                  .filter(Boolean)
-                  .join(' | ')
-              : null
-
-          throw new Error(
-            detailsMessage || payload.error || 'Unable to load live shipping options.'
-          )
+          throw new Error(getPublicRequestError(response.status, CHECKOUT_ERROR_MESSAGE))
         }
 
         const nextQuote = parseQuoteResponse(payload)
 
-        if (!nextQuote) {
-          throw new Error('Unable to load live shipping options.')
+        if (!nextQuote?.checkoutSessionToken) {
+          throw new Error(CHECKOUT_ERROR_MESSAGE)
         }
 
         if (!isActive) {
@@ -849,14 +847,8 @@ export default function CheckoutPage() {
         }
 
         setQuote(nextQuote)
-        if (nextQuote.discount) {
-          setAppliedDiscount(nextQuote.discount)
-          setDiscountCode(nextQuote.discount.code)
-          setAppliedDiscountCode(nextQuote.discount.code)
-        } else {
-          setAppliedDiscount(null)
-          setAppliedDiscountCode(null)
-        }
+        setAppliedDiscount(null)
+        setDiscountSuccessMessage(null)
 
         const currentSelectedShippingOptionId =
           form.getValues('shipping.selectedShippingOptionId') ?? ''
@@ -876,9 +868,7 @@ export default function CheckoutPage() {
         }
 
         setQuote(null)
-        setQuoteError(
-          error instanceof Error ? error.message : 'Unable to load live shipping options.'
-        )
+        setQuoteError(error instanceof Error ? error.message : CHECKOUT_ERROR_MESSAGE)
       } finally {
         if (isActive) {
           setIsLoadingQuote(false)
@@ -933,17 +923,13 @@ export default function CheckoutPage() {
         }
 
         if (!response.ok) {
-          throw new Error(
-            typeof payload.error === 'string'
-              ? payload.error
-              : 'Unable to initialize Stripe payment form.'
-          )
+          throw new Error(getPublicRequestError(response.status, CHECKOUT_ERROR_MESSAGE))
         }
 
         const nextPaymentSession = parsePaymentIntentResponse(payload)
 
         if (!nextPaymentSession) {
-          throw new Error('Unable to initialize Stripe payment form.')
+          throw new Error(CHECKOUT_ERROR_MESSAGE)
         }
 
         if (!isActive) {
@@ -971,7 +957,7 @@ export default function CheckoutPage() {
         setPaymentError(
           error instanceof Error
             ? error.message
-            : 'Unable to initialize Stripe payment form.'
+            : CHECKOUT_ERROR_MESSAGE
         )
       } finally {
         if (isActive) {
@@ -1366,9 +1352,11 @@ export default function CheckoutPage() {
                 <div className="space-y-4">
                   {!canRequestQuote ? (
                     <div className="rounded-2xl border border-dashed border-brand-350 bg-brand-50 px-4 py-6 text-sm text-gray-500">
-                      {usesGoogleManagedAddress
-                        ? 'Select a suggested address to load taxes and shipping options.'
-                        : 'Complete the shipping address to request live rates.'}
+                      {cartIntegrityError
+                        ? cartIntegrityError
+                        : usesGoogleManagedAddress
+                         ? 'Select a suggested address to load taxes and shipping options.'
+                         : 'Complete the shipping address to request live rates.'}
                     </div>
                   ) : null}
 
@@ -1459,6 +1447,11 @@ export default function CheckoutPage() {
             </h3>
 
             <div className="mb-6 space-y-4 border-b border-gray-100 pb-6">
+              {cartIntegrityError ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  {cartIntegrityError}
+                </div>
+              ) : null}
               {items.map((item) => {
                 const selectedOptionsLabel = formatSelectedOptions(item)
 
@@ -1503,6 +1496,10 @@ export default function CheckoutPage() {
                         setDiscountError(null)
                         setDiscountSuccessMessage(null)
 
+                        if (appliedDiscountCode && appliedDiscountCode !== nextValue.trim()) {
+                          setAppliedDiscountCode(null)
+                        }
+
                         if (appliedDiscount && appliedDiscount.code !== nextValue.trim()) {
                           setAppliedDiscount(null)
                         }
@@ -1523,8 +1520,8 @@ export default function CheckoutPage() {
 
                   {!canApplyDiscount && !appliedDiscount ? (
                     <p className="text-sm text-gray-500">
-                      Complete city, state, postal code, and country before applying a
-                      discount code.
+                      {cartIntegrityError ??
+                        'Complete the shipping address first so we can refresh checkout before applying a discount code.'}
                     </p>
                   ) : null}
 

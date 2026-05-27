@@ -1,4 +1,6 @@
 export interface ProductOptionValue {
+  id?: string
+  documentId?: string
   value: string
   label: string
   hexColor?: string
@@ -53,6 +55,7 @@ export interface Product {
   selectedColor?: string
   selectedSize?: string
   selectedOptions?: Record<string, string>
+  selectedOptionValueIds?: Record<string, string>
 }
 
 export interface Category {

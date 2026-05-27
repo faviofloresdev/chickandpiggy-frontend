@@ -40,19 +40,51 @@ export const checkoutShippingSchema = checkoutAddressSchema.extend({
 
 export const checkoutBillingSchema = checkoutAddressSchema
 
-export const checkoutItemsSchema = z.array(z.unknown()).min(1, 'Checkout requires at least one item.')
+export const checkoutSelectedOptionSchema = z
+  .object({
+    optionValueId: z.string().trim().min(1, 'Option value is required.'),
+  })
+  .strict()
+
+export const checkoutItemSchema = z
+  .object({
+    productId: z.string().trim().min(1, 'Product is required.'),
+    variantId: z.string().trim().min(1).optional(),
+    quantity: z.number().int().min(1).max(99),
+    selectedOptions: z.array(checkoutSelectedOptionSchema),
+  })
+  .strict()
+
+export const checkoutItemsSchema = z
+  .array(checkoutItemSchema)
+  .min(1, 'Checkout requires at least one item.')
+
 export const checkoutDiscountCodeSchema = z
   .string()
   .trim()
   .min(1, 'Discount code is required.')
   .max(64, 'Discount code is too long.')
 
+export const checkoutSessionTokenSchema = z
+  .string()
+  .trim()
+  .min(1, 'Checkout session token is required.')
+
+const checkoutQuoteShippingSchema = checkoutShippingSchema.omit({
+  selectedShippingOptionId: true,
+  googleValidatedAddress: true,
+})
+
 export const checkoutQuoteRequestSchema = z.object({
   items: checkoutItemsSchema,
-  shipping: checkoutShippingSchema.omit({
-    selectedShippingOptionId: true,
-  }),
-  discountCode: checkoutDiscountCodeSchema.optional(),
+  shipping: checkoutQuoteShippingSchema,
+})
+
+export const checkoutDiscountRequestSchema = z.object({
+  items: checkoutItemsSchema,
+  shipping: checkoutQuoteShippingSchema,
+  discountCode: checkoutDiscountCodeSchema,
+  checkoutSessionToken: checkoutSessionTokenSchema,
 })
 
 export const checkoutPaymentIntentRequestSchema = z.object({
@@ -63,9 +95,13 @@ export const checkoutPaymentIntentRequestSchema = z.object({
       .string()
       .trim()
       .min(1, 'Please choose a shipping option before continuing.'),
+    googleValidatedAddress: z.boolean().optional(),
+  }).omit({
+    googleValidatedAddress: true,
   }),
   billing: checkoutBillingSchema.optional(),
   discountCode: checkoutDiscountCodeSchema.optional(),
+  checkoutSessionToken: checkoutSessionTokenSchema,
   orderId: z.number().int().positive().optional(),
   paymentIntentId: z.string().trim().min(1).optional(),
 })
@@ -74,4 +110,5 @@ export type CheckoutCustomerDetails = z.infer<typeof checkoutCustomerSchema>
 export type CheckoutShippingDetails = z.infer<typeof checkoutShippingSchema>
 export type CheckoutBillingDetails = z.infer<typeof checkoutBillingSchema>
 export type CheckoutQuoteRequest = z.infer<typeof checkoutQuoteRequestSchema>
+export type CheckoutDiscountRequest = z.infer<typeof checkoutDiscountRequestSchema>
 export type CheckoutPaymentIntentRequest = z.infer<typeof checkoutPaymentIntentRequestSchema>
