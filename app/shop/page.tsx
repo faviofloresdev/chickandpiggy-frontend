@@ -6,7 +6,7 @@ import { ProductCard } from '@/components/products/product-card'
 import { ShopProductConfigurator } from '@/components/products/shop-product-configurator'
 import { ShopSortForm } from '@/components/products/shop-sort-form'
 import { strapiCatalogApi } from '@/lib/api/strapi'
-import type { Category, Product, ProductOptionGroup, ProductOptionValue } from '@/lib/api/contracts'
+import type { Category, Product, ProductAttribute, ProductAttributeValue } from '@/lib/api/contracts'
 import { buildPageMetadata } from '@/lib/seo/metadata'
 
 const PRODUCTS_PER_PAGE = 6
@@ -17,13 +17,13 @@ type SearchParams = Record<string, string | string[] | undefined>
 
 export const revalidate = 300
 
-interface ProductOptionFilterValue extends ProductOptionValue {
+interface ProductOptionFilterValue extends ProductAttributeValue {
   count: number
 }
 
 interface ProductOptionFilterGroup {
   type: string
-  label: string
+  name: string
   values: ProductOptionFilterValue[]
 }
 
@@ -214,14 +214,14 @@ function readSelectedOptionFilters(searchParams: SearchParams) {
 
 function collectProductOptionValues(product: Product, optionType: string) {
   const variantValues = product.variants
-    ?.map((variant) => variant.optionValues?.[optionType]?.value)
+    ?.map((variant) => variant.attributeValues?.[optionType]?.value)
     .filter((value): value is string => Boolean(value))
 
   if (variantValues && variantValues.length > 0) {
     return [...new Set(variantValues)]
   }
 
-  const optionGroup = product.productOptions?.find((option) => option.type === optionType)
+  const optionGroup = product.attributes?.find((option) => option.type === optionType)
 
   return optionGroup ? optionGroup.values.map((value) => value.value) : []
 }
@@ -239,7 +239,7 @@ function productMatchesOptionFilters(
   if (product.variants && product.variants.length > 0) {
     return product.variants.some((variant) =>
       activeFilters.every(([type, values]) => {
-        const optionValue = variant.optionValues?.[type]?.value
+        const optionValue = variant.attributeValues?.[type]?.value
         return optionValue ? values.includes(optionValue) : false
       })
     )
@@ -262,9 +262,9 @@ function buildOptionFilterGroups(products: Product[]) {
   products.forEach((product) => {
     const seenProductValues = new Set<string>()
 
-    ;(product.productOptions ?? []).forEach((option: ProductOptionGroup) => {
+    ;(product.attributes ?? []).forEach((option: ProductAttribute) => {
       const existingGroup = groups.get(option.type) ?? {
-        label: option.label,
+        label: option.name,
         values: new Map<string, ProductOptionFilterValue>(),
       }
 
@@ -295,10 +295,10 @@ function buildOptionFilterGroups(products: Product[]) {
   return [...groups.entries()]
     .map(([type, group]) => ({
       type,
-      label: group.label,
+      name: group.label,
       values: [...group.values.values()].sort((a, b) => a.label.localeCompare(b.label)),
     }))
-    .sort((a, b) => a.label.localeCompare(b.label))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 function isColorFilter(optionType: string) {
@@ -346,32 +346,38 @@ export default async function ShopPage({
   const currentPage = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1
 
   const categoryOptions = buildCategoryList(products, categories)
-  const optionFilterGroups = buildOptionFilterGroups(products)
-
-  const filteredProducts = sortProducts(
-    products.filter((product) => {
-      const matchesCategory =
-        selectedCategory === 'all' ||
-        Boolean(
-          product.categories?.some(
-            (category) => (category.slug ?? category.id) === selectedCategory
-          )
+  const catalogProducts = products.filter((product) => {
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      Boolean(
+        product.categories?.some(
+          (category) => (category.slug ?? category.id) === selectedCategory
         )
-      const matchesPrice =
-        selectedPriceRanges.length === 0 ||
-        selectedPriceRanges.some((range) => matchesPriceRange(product.price, range))
-      const matchesOptions = productMatchesOptionFilters(product, selectedOptionFilters)
+      )
+    const matchesPrice =
+      selectedPriceRanges.length === 0 ||
+      selectedPriceRanges.some((range) => matchesPriceRange(product.price, range))
 
-      return matchesCategory && matchesPrice && matchesOptions
-    }),
-    selectedSort
-  )
+    return matchesCategory && matchesPrice
+  })
 
   const selectedProduct = selectedProductId
-    ? filteredProducts.find(
+    ? catalogProducts.find(
+        (product) => product.id === selectedProductId || product.slug === selectedProductId
+      ) ??
+      products.find(
         (product) => product.id === selectedProductId || product.slug === selectedProductId
       )
     : undefined
+
+  const optionFilterGroups = buildOptionFilterGroups(
+    selectedProduct ? [selectedProduct] : catalogProducts
+  )
+
+  const filteredProducts = sortProducts(
+    catalogProducts.filter((product) => productMatchesOptionFilters(product, selectedOptionFilters)),
+    selectedSort
+  )
 
   const totalProducts = filteredProducts.length
   const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE))
@@ -507,7 +513,7 @@ export default async function ShopPage({
               return (
                 <div key={optionGroup.type}>
                   <h3 className="mb-4 border-b border-gray-100 pb-2 text-lg font-semibold tracking-tight text-gray-900">
-                    {optionGroup.label}
+                    {optionGroup.name}
                   </h3>
                   <div className="space-y-3">
                     {optionGroup.values.map((value) => (
@@ -525,7 +531,7 @@ export default async function ShopPage({
                         {isColorFilter(optionGroup.type) ? (
                           <span
                             className="h-3 w-3 rounded-full border border-black/10"
-                            style={{ backgroundColor: value.hexColor ?? value.value }}
+                            style={{ backgroundColor: value.hex ?? value.hexColor ?? value.value }}
                             aria-hidden="true"
                           />
                         ) : null}

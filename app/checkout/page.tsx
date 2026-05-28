@@ -937,12 +937,9 @@ export default function CheckoutPage() {
         }
 
         setPaymentSession(nextPaymentSession)
-        if (nextPaymentSession.orderId) {
-          persistedOrderIdRef.current = nextPaymentSession.orderId
-        }
-        if (nextPaymentSession.paymentIntentId) {
-          persistedPaymentIntentIdRef.current = nextPaymentSession.paymentIntentId
-        }
+        persistedOrderIdRef.current = nextPaymentSession.orderId ?? null
+        persistedPaymentIntentIdRef.current =
+          nextPaymentSession.paymentIntentId ?? null
         if (nextPaymentSession.discount) {
           setAppliedDiscount(nextPaymentSession.discount)
           setAppliedDiscountCode(nextPaymentSession.discount.code)

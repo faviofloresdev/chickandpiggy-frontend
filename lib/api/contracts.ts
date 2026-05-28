@@ -1,16 +1,17 @@
-export interface ProductOptionValue {
+export interface ProductAttributeValue {
   id?: string
   documentId?: string
   value: string
   label: string
+  hex?: string
   hexColor?: string
 }
 
-export interface ProductOptionGroup {
+export interface ProductAttribute {
   id: string
   type: string
-  label: string
-  values: ProductOptionValue[]
+  name: string
+  values: ProductAttributeValue[]
 }
 
 export interface ProductVariant {
@@ -24,7 +25,7 @@ export interface ProductVariant {
   colorLabel?: string
   colorHex?: string
   size?: string
-  optionValues?: Record<string, ProductOptionValue>
+  attributeValues?: Record<string, ProductAttributeValue>
   stock?: number
 }
 
@@ -42,12 +43,13 @@ export interface Product {
   name: string
   price: number
   image: string
+  exclusive?: boolean
   description?: string
   metaTitle?: string
   metaDescription?: string
   ogImage?: string
   categories?: ProductCategory[]
-  productOptions?: ProductOptionGroup[]
+  attributes?: ProductAttribute[]
   availableColors?: string[]
   availableSizes?: string[]
   variants?: ProductVariant[]
@@ -57,6 +59,9 @@ export interface Product {
   selectedOptions?: Record<string, string>
   selectedOptionValueIds?: Record<string, string>
 }
+
+export type ProductOptionValue = ProductAttributeValue
+export type ProductOptionGroup = ProductAttribute
 
 export interface Category {
   id: string

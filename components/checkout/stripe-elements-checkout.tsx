@@ -97,6 +97,7 @@ export function StripeElementsCheckout({
 
         {!isLoading && paymentSession?.clientSecret && stripePromise ? (
           <Elements
+            key={paymentSession.paymentIntentId ?? paymentSession.clientSecret}
             stripe={stripePromise}
             options={{
               clientSecret: paymentSession.clientSecret,

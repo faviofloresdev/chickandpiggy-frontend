@@ -14,9 +14,9 @@ import type {
   HeroContent,
   PromoBannerContent,
   Product,
+  ProductAttribute,
+  ProductAttributeValue,
   ProductCategory,
-  ProductOptionGroup,
-  ProductOptionValue,
   RichTextNode,
   ProductVariant,
 } from '@/lib/api/contracts'
@@ -76,9 +76,10 @@ const STRAPI_TOKEN = env.strapiToken
 const PRODUCT_POPULATE_QUERY = {
   'populate[0]': 'images',
   'populate[1]': 'categories',
-  'populate[2]': 'product_options.option_values',
-  'populate[3]': 'product_variants.option_values',
-  'populate[4]': 'ogImage',
+  'populate[2]': 'ogImage',
+  'populate[3]': 'attributes.values',
+  'populate[4]': 'variants.attribute_values',
+  'populate[5]': 'variants.image',
 } as const
 
 function appendQueryParams(url: URL, query?: Record<string, QueryValue>) {
@@ -351,6 +352,52 @@ function normalizeOptionType(value: unknown) {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
 }
 
+function normalizeAttributeName(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function getAttributeKey(attribute: Record<string, unknown>) {
+  const normalizedType = normalizeOptionType(getAttribute(attribute, 'type'))
+
+  if (normalizedType) {
+    return normalizedType
+  }
+
+  const normalizedName = normalizeAttributeName(getAttribute(attribute, 'name'))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+
+  if (normalizedName) {
+    return normalizedName
+  }
+
+  return String(getAttribute(attribute, 'documentId') ?? getAttribute(attribute, 'id') ?? crypto.randomUUID())
+}
+
+function isColorAttribute(attribute: Record<string, unknown>) {
+  const type = normalizeOptionType(getAttribute(attribute, 'type'))
+  const name = normalizeAttributeName(getAttribute(attribute, 'name')).toLowerCase()
+
+  return type === 'color' || name.includes('color')
+}
+
+function getProductAttributesSource(entry: Record<string, unknown>) {
+  return getAttribute(entry, 'attributes')
+}
+
+function getProductVariantsSource(entry: Record<string, unknown>) {
+  return getAttribute(entry, 'variants')
+}
+
+function getAttributeValuesSource(attribute: Record<string, unknown>) {
+  return getAttribute(attribute, 'values')
+}
+
+function getVariantAttributeValuesSource(variant: Record<string, unknown>) {
+  return getAttribute(variant, 'attribute_values')
+}
+
 function formatOptionLabel(value: string) {
   return value
     .split(/[_\s-]+/)
@@ -424,48 +471,44 @@ function classifyOptionValue(
   return undefined
 }
 
-function buildProductOptions(entry: Record<string, unknown>): ProductOptionGroup[] {
-  const options = asArray<Record<string, unknown>>(
-    getAttribute(entry, 'product_options') ?? getAttribute(entry, 'productOptions')
-  )
+function buildProductAttributes(entry: Record<string, unknown>): ProductAttribute[] {
+  const attributes = asArray<Record<string, unknown>>(getProductAttributesSource(entry))
 
-  const groupedOptions = new Map<
+  const groupedAttributes = new Map<
     string,
     {
       id: string
       label: string
-      values: Map<string, ProductOptionValue>
+      values: Map<string, ProductAttributeValue>
     }
   >()
 
-  options.forEach((option) => {
-    const type = normalizeOptionType(getAttribute(option, 'type'))
-
-    if (!type) {
-      return
-    }
+  attributes.forEach((attribute) => {
+    const type = getAttributeKey(attribute)
 
     const optionLabel =
-      typeof getAttribute(option, 'name') === 'string' && String(getAttribute(option, 'name')).trim()
-        ? String(getAttribute(option, 'name')).trim()
+      typeof getAttribute(attribute, 'name') === 'string' && String(getAttribute(attribute, 'name')).trim()
+        ? String(getAttribute(attribute, 'name')).trim()
         : formatOptionLabel(type)
 
-    const existingGroup = groupedOptions.get(type) ?? {
-      id: String(getAttribute(option, 'documentId') ?? getAttribute(option, 'id') ?? type),
+    const existingGroup = groupedAttributes.get(type) ?? {
+      id: String(getAttribute(attribute, 'documentId') ?? getAttribute(attribute, 'id') ?? type),
       label: optionLabel,
-      values: new Map<string, ProductOptionValue>(),
+      values: new Map<string, ProductAttributeValue>(),
     }
 
-    asArray<Record<string, unknown>>(getAttribute(option, 'option_values')).forEach((optionValue) => {
+    asArray<Record<string, unknown>>(getAttributeValuesSource(attribute)).forEach((optionValue) => {
       const label = extractOptionValueLabel(optionValue)
 
       if (!label) {
         return
       }
 
-      const normalizedValue = type === 'color' ? label.toLowerCase() : label
+      const normalizedValue = isColorAttribute(attribute) ? label.toLowerCase() : label
 
       if (!existingGroup.values.has(normalizedValue)) {
+        const hexColor = getOptionHexColor(optionValue)
+
         existingGroup.values.set(normalizedValue, {
           id:
             getAttribute(optionValue, 'id') !== undefined
@@ -479,27 +522,37 @@ function buildProductOptions(entry: Record<string, unknown>): ProductOptionGroup
               : undefined,
           value: normalizedValue,
           label,
-          hexColor:
-            typeof getAttribute(optionValue, 'hexColor') === 'string'
-              ? String(getAttribute(optionValue, 'hexColor'))
-              : undefined,
+          hex: hexColor,
+          hexColor,
         })
       }
     })
 
-    groupedOptions.set(type, existingGroup)
+    groupedAttributes.set(type, existingGroup)
   })
 
-  return [...groupedOptions.entries()].map(([type, group]) => ({
+  return [...groupedAttributes.entries()].map(([type, group]) => ({
     id: group.id,
     type,
-    label: group.label,
+    name: group.label,
     values: [...group.values.values()],
   }))
 }
 
-function mergeProductOptionValues(
-  productOptions: ProductOptionGroup[],
+function getOptionHexColor(optionValue: Record<string, unknown>) {
+  if (typeof getAttribute(optionValue, 'hex') === 'string') {
+    return String(getAttribute(optionValue, 'hex'))
+  }
+
+  if (typeof getAttribute(optionValue, 'hexColor') === 'string') {
+    return String(getAttribute(optionValue, 'hexColor'))
+  }
+
+  return undefined
+}
+
+function mergeProductAttributeValues(
+  productAttributes: ProductAttribute[],
   variants: Record<string, unknown>[],
   optionValueIndex: Map<string, string>,
   optionTypeSet: Set<string>
@@ -509,20 +562,20 @@ function mergeProductOptionValues(
     {
       id: string
       label: string
-      values: Map<string, ProductOptionValue>
+      values: Map<string, ProductAttributeValue>
     }
   >()
 
-  productOptions.forEach((option) => {
+  productAttributes.forEach((option) => {
     optionGroups.set(option.type, {
       id: option.id,
-      label: option.label,
+      label: option.name,
       values: new Map(option.values.map((value) => [value.value, value])),
     })
   })
 
   variants.forEach((variant) => {
-    const optionValues = asArray<Record<string, unknown>>(getAttribute(variant, 'option_values'))
+    const optionValues = asArray<Record<string, unknown>>(getVariantAttributeValuesSource(variant))
 
     optionValues.forEach((optionValue) => {
       const classified = classifyOptionValue(optionValue, optionValueIndex, optionTypeSet)
@@ -535,10 +588,12 @@ function mergeProductOptionValues(
       const existingGroup = optionGroups.get(classified.type) ?? {
         id: classified.type,
         label: formatOptionLabel(classified.type),
-        values: new Map<string, ProductOptionValue>(),
+        values: new Map<string, ProductAttributeValue>(),
       }
 
       if (!existingGroup.values.has(normalizedValue)) {
+        const hexColor = getOptionHexColor(optionValue)
+
         existingGroup.values.set(normalizedValue, {
           id:
             getAttribute(optionValue, 'id') !== undefined
@@ -552,10 +607,8 @@ function mergeProductOptionValues(
               : undefined,
           value: normalizedValue,
           label: classified.label,
-          hexColor:
-            typeof getAttribute(optionValue, 'hexColor') === 'string'
-              ? String(getAttribute(optionValue, 'hexColor'))
-              : undefined,
+          hex: hexColor,
+          hexColor,
         })
       }
 
@@ -566,7 +619,7 @@ function mergeProductOptionValues(
   return [...optionGroups.entries()].map(([type, group]) => ({
     id: group.id,
     type,
-    label: group.label,
+    name: group.label,
     values: [...group.values.values()],
   }))
 }
@@ -580,12 +633,12 @@ function normalizeProductVariantEntry(
     return undefined
   }
 
-  const optionValues = asArray<Record<string, unknown>>(getAttribute(variant, 'option_values'))
+  const optionValues = asArray<Record<string, unknown>>(getVariantAttributeValuesSource(variant))
   let color: string | undefined
   let colorLabel: string | undefined
   let colorHex: string | undefined
   let size: string | undefined
-  const optionEntries: Record<string, ProductOptionValue> = {}
+  const optionEntries: Record<string, ProductAttributeValue> = {}
 
   optionValues.forEach((optionValue) => {
     const classified = classifyOptionValue(optionValue, optionValueIndex, optionTypeSet)
@@ -597,15 +650,14 @@ function normalizeProductVariantEntry(
     if (classified.type === 'color') {
       color = classified.value
       colorLabel = classified.label
-      colorHex =
-        typeof getAttribute(optionValue, 'hexColor') === 'string'
-          ? String(getAttribute(optionValue, 'hexColor'))
-          : undefined
+      colorHex = getOptionHexColor(optionValue)
     }
 
     if (classified.type === 'size') {
       size = classified.value
     }
+
+    const hexColor = getOptionHexColor(optionValue)
 
     optionEntries[classified.type] = {
       id:
@@ -620,10 +672,8 @@ function normalizeProductVariantEntry(
           : undefined,
       value: classified.type === 'color' ? classified.value : classified.value,
       label: classified.label,
-      hexColor:
-        typeof getAttribute(optionValue, 'hexColor') === 'string'
-          ? String(getAttribute(optionValue, 'hexColor'))
-          : undefined,
+      hex: hexColor,
+      hexColor,
     }
   })
 
@@ -650,7 +700,7 @@ function normalizeProductVariantEntry(
     colorLabel,
     colorHex,
     size,
-    optionValues: Object.keys(optionEntries).length > 0 ? optionEntries : undefined,
+    attributeValues: Object.keys(optionEntries).length > 0 ? optionEntries : undefined,
     stock:
       Number.isFinite(Number(getAttribute(variant, 'stock')))
         ? Number(getAttribute(variant, 'stock'))
@@ -659,21 +709,19 @@ function normalizeProductVariantEntry(
 }
 
 function normalizeProductVariants(entry: Record<string, unknown>) {
-  const options = asArray<Record<string, unknown>>(
-    getAttribute(entry, 'product_options') ?? getAttribute(entry, 'productOptions')
+  const options = asArray<Record<string, unknown>>(getProductAttributesSource(entry))
+  const variants = asArray<Record<string, unknown>>(getProductVariantsSource(entry)).filter(
+    (variant) => getAttribute(variant, 'active') !== false
   )
-  const variants = asArray<Record<string, unknown>>(
-    getAttribute(entry, 'product_variants') ?? getAttribute(entry, 'productVariants')
-  ).filter((variant) => getAttribute(variant, 'active') !== false)
 
   const optionTypeSet = new Set(
-    options.map((option) => normalizeOptionType(getAttribute(option, 'type'))).filter(Boolean)
+    options.map((option) => getAttributeKey(option)).filter(Boolean)
   )
 
   const optionValueIndex = options.reduce(
     (acc, option) => {
-      const optionType = normalizeOptionType(getAttribute(option, 'type'))
-      const optionValues = asArray<Record<string, unknown>>(getAttribute(option, 'option_values'))
+      const optionType = getAttributeKey(option)
+      const optionValues = asArray<Record<string, unknown>>(getAttributeValuesSource(option))
 
       optionValues.forEach((optionValue) => {
         const normalizedValue = extractOptionValueLabel(optionValue)?.toLowerCase()
@@ -687,8 +735,8 @@ function normalizeProductVariants(entry: Record<string, unknown>) {
     new Map<string, string>()
   )
 
-  const productOptions = mergeProductOptionValues(
-    buildProductOptions(entry),
+  const productAttributes = mergeProductAttributeValues(
+    buildProductAttributes(entry),
     variants,
     optionValueIndex,
     optionTypeSet
@@ -698,7 +746,7 @@ function normalizeProductVariants(entry: Record<string, unknown>) {
   const normalizedVariants: ProductVariant[] = []
 
   variants.forEach((variant) => {
-    const optionValues = asArray<Record<string, unknown>>(getAttribute(variant, 'option_values'))
+    const optionValues = asArray<Record<string, unknown>>(getVariantAttributeValuesSource(variant))
     const normalizedVariant = normalizeProductVariantEntry(
       variant,
       optionValueIndex,
@@ -723,117 +771,32 @@ function normalizeProductVariants(entry: Record<string, unknown>) {
     })
   })
 
+  const filteredProductAttributes =
+    normalizedVariants.length > 0
+      ? productAttributes
+          .map((attribute) => {
+            const variantValues = normalizedVariants
+              .map((variant) => variant.attributeValues?.[attribute.type])
+              .filter((value): value is ProductAttributeValue => Boolean(value))
+            const allowedValues = new Set(variantValues.map((value) => value.value))
+
+            if (allowedValues.size === 0) {
+              return undefined
+            }
+
+            return {
+              ...attribute,
+              values: attribute.values.filter((value) => allowedValues.has(value.value)),
+            }
+          })
+          .filter((attribute): attribute is ProductAttribute => Boolean(attribute && attribute.values.length > 0))
+      : productAttributes
+
   return {
-    productOptions,
+    attributes: filteredProductAttributes,
     availableColors: uniqueStrings(availableColors),
     availableSizes: uniqueStrings(availableSizes),
     variants: normalizedVariants,
-  }
-}
-
-function mergeExternalVariants(product: Product, variants: ProductVariant[] | undefined): Product {
-  if (!variants || variants.length === 0) {
-    return product
-  }
-
-  const availableColors = uniqueStrings(
-    variants.map((variant) => variant.color).filter((value): value is string => Boolean(value))
-  )
-  const availableSizes = uniqueStrings(
-    variants.map((variant) => variant.size).filter((value): value is string => Boolean(value))
-  )
-
-  return {
-    ...product,
-    availableColors: availableColors.length > 0 ? availableColors : product.availableColors,
-    availableSizes: availableSizes.length > 0 ? availableSizes : product.availableSizes,
-    variants,
-  }
-}
-
-async function loadProductVariantIndex(products: Record<string, unknown>[]) {
-  const productContexts = new Map<string, { optionValueIndex: Map<string, string>; optionTypeSet: Set<string> }>()
-
-  products.forEach((product) => {
-    const documentId = getAttribute(product, 'documentId')
-    if (typeof documentId === 'string' && documentId) {
-      const options = asArray<Record<string, unknown>>(
-        getAttribute(product, 'product_options') ?? getAttribute(product, 'productOptions')
-      )
-
-      const optionTypeSet = new Set(
-        options.map((option) => normalizeOptionType(getAttribute(option, 'type'))).filter(Boolean)
-      )
-      const optionValueIndex = options.reduce(
-        (acc, option) => {
-          const optionType = normalizeOptionType(getAttribute(option, 'type'))
-          const optionValues = asArray<Record<string, unknown>>(getAttribute(option, 'option_values'))
-
-          optionValues.forEach((optionValue) => {
-            const normalizedValue = extractOptionValueLabel(optionValue)?.toLowerCase()
-            if (normalizedValue && optionType) {
-              acc.set(normalizedValue, optionType)
-            }
-          })
-
-          return acc
-        },
-        new Map<string, string>()
-      )
-
-      productContexts.set(documentId, { optionValueIndex, optionTypeSet })
-    }
-  })
-
-  if (productContexts.size === 0) {
-    return new Map<string, ProductVariant[]>()
-  }
-
-  try {
-    const payload = await strapiFetch<unknown>(strapiEndpoints.productVariants, {
-      query: {
-        'populate[0]': 'product',
-        'populate[1]': 'option_values',
-        'populate[2]': 'image',
-        'filters[active][$eq]': true,
-      },
-      tags: ['catalog', 'product-variants'],
-    })
-
-    const variantIndex = new Map<string, ProductVariant[]>()
-
-    asArray<Record<string, unknown>>(payload).forEach((variant) => {
-      const product = asSingleRecord(getAttribute(variant, 'product'))
-      const productDocumentId = getAttribute(product ?? {}, 'documentId')
-
-      if (typeof productDocumentId !== 'string' || !productContexts.has(productDocumentId)) {
-        return
-      }
-
-      const context = productContexts.get(productDocumentId)
-      if (!context) {
-        return
-      }
-
-      const normalizedVariant = normalizeProductVariantEntry(
-        variant,
-        context.optionValueIndex,
-        context.optionTypeSet
-      )
-
-      if (!normalizedVariant) {
-        return
-      }
-
-      const variants = variantIndex.get(productDocumentId) ?? []
-      variants.push(normalizedVariant)
-      variantIndex.set(productDocumentId, variants)
-    })
-
-    return variantIndex
-  } catch (error) {
-    logFallback('product-variants', error)
-    return new Map<string, ProductVariant[]>()
   }
 }
 
@@ -861,6 +824,7 @@ function normalizeProduct(entry: Record<string, unknown>): Product {
     name: String(getAttribute(entry, 'name') ?? getAttribute(entry, 'title') ?? 'Untitled product'),
     price: Number(getAttribute(entry, 'price') ?? getAttribute(entry, 'basePrice') ?? 0),
     image: resolveMediaUrl(entry),
+      exclusive: Boolean(getAttribute(entry, 'exclusive') ?? false),
       description:
         extractRichText(getAttribute(entry, 'description')) ??
         (typeof getAttribute(entry, 'description') === 'string'
@@ -876,7 +840,7 @@ function normalizeProduct(entry: Record<string, unknown>): Product {
           : undefined,
       ogImage: ogImage ? resolveMediaUrl({ image: [ogImage] }) : undefined,
       categories,
-      productOptions: productVariants.productOptions,
+      attributes: productVariants.attributes,
       availableColors: productVariants.availableColors,
     availableSizes: productVariants.availableSizes,
     variants: productVariants.variants,
@@ -1426,16 +1390,8 @@ export const strapiCatalogApi = {
       })
 
       const productEntries = asArray<Record<string, unknown>>(payload)
-      const productVariantIndex = await loadProductVariantIndex(productEntries)
       const products = productEntries
-        .map((entry) =>
-          mergeExternalVariants(
-            normalizeProduct(entry),
-            productVariantIndex.get(
-              String(getAttribute(entry, 'documentId') ?? getAttribute(entry, 'id') ?? '')
-            )
-          )
-        )
+        .map((entry) => normalizeProduct(entry))
         .filter((product) => product.image)
 
       return {
@@ -1471,27 +1427,20 @@ export const strapiCatalogApi = {
         query: {
           ...PRODUCT_POPULATE_QUERY,
           sort: 'createdAt:desc',
-          'filters[exclusive][$eq]': true,
           'pagination[limit]': resolvedLimit,
         },
         tags: ['catalog', 'products', 'featured-products'],
       })
 
       const productEntries = asArray<Record<string, unknown>>(payload)
-      const productVariantIndex = await loadProductVariantIndex(productEntries)
       const products = productEntries
-        .map((entry) =>
-          mergeExternalVariants(
-            normalizeProduct(entry),
-            productVariantIndex.get(
-              String(getAttribute(entry, 'documentId') ?? getAttribute(entry, 'id') ?? '')
-            )
-          )
-        )
+        .map((entry) => normalizeProduct(entry))
         .filter((product) => product.image)
+      const exclusiveProducts = products.filter((product) => product.exclusive)
+      const featuredProducts = exclusiveProducts.length > 0 ? exclusiveProducts : products
 
       return {
-        data: resolvedLimit ? products.slice(0, resolvedLimit) : products,
+        data: resolvedLimit ? featuredProducts.slice(0, resolvedLimit) : featuredProducts,
         source: 'strapi',
       }
     } catch (error) {

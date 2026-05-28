@@ -16,8 +16,8 @@ export function ProductCard({
 }: ProductCardProps) {
   const productHref = `/shop?product=${encodeURIComponent(product.slug || product.id)}#selected-product`
   const optionGroups = useMemo(
-    () => (product.productOptions ?? []).filter((option) => option.values.length > 0),
-    [product.productOptions]
+    () => (product.attributes ?? []).filter((option) => option.values.length > 0),
+    [product.attributes]
   )
 
   return (
@@ -48,7 +48,7 @@ export function ProductCard({
                   className="flex items-center gap-2"
                 >
                   <span className="min-w-0 text-[10px] uppercase tracking-[0.18em] text-gray-400">
-                    {option.label}
+                    {option.name}
                   </span>
                   {option.type === 'color' ? (
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -56,7 +56,7 @@ export function ProductCard({
                         <span
                           key={`${product.id}-${option.type}-${value.value}`}
                           className="h-2.5 w-2.5 rounded-full border border-black/10"
-                          style={{ backgroundColor: value.hexColor ?? value.value }}
+                          style={{ backgroundColor: value.hex ?? value.hexColor ?? value.value }}
                           title={value.label}
                           aria-label={value.label}
                         />
