@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Minus, Plus, ShoppingCart } from 'lucide-react'
 
-import type { Product, ProductOptionGroup, ProductVariant } from '@/lib/api/contracts'
+import type { Product, ProductAttribute, ProductVariant } from '@/lib/api/contracts'
 import { toast } from '@/hooks/use-toast'
 import { useCartStore } from '@/lib/store/cart-store'
 
@@ -42,30 +42,38 @@ function findMatchingVariant(
 
   return variants?.find((variant) =>
     selectedEntries.every(
-      ([type, value]) => variant.optionValues?.[type]?.value === value
+      ([type, value]) => variant.attributeValues?.[type]?.value === value
     )
   )
 }
 
-function isColorOption(option: ProductOptionGroup) {
+function isColorOption(option: ProductAttribute) {
   return option.type === 'color'
 }
 
 function getSelectedOptionValueIds(
-  productOptions: ProductOptionGroup[],
-  selectedOptions: Record<string, string>
+  attributes: ProductAttribute[],
+  selectedOptions: Record<string, string>,
+  selectedVariant: ProductVariant | undefined
 ) {
-  return productOptions.reduce<Record<string, string>>((acc, option) => {
-    const selectedValue = selectedOptions[option.type]
+  return attributes.reduce<Record<string, string>>((acc, attribute) => {
+    const selectedValue = selectedOptions[attribute.type]
 
     if (!selectedValue) {
       return acc
     }
 
-    const optionValue = option.values.find((value) => value.value === selectedValue)
+    const variantValue = selectedVariant?.attributeValues?.[attribute.type]
+
+    if (variantValue?.value === selectedValue && variantValue.id) {
+      acc[attribute.type] = variantValue.id
+      return acc
+    }
+
+    const optionValue = attribute.values.find((value) => value.value === selectedValue)
 
     if (optionValue?.id) {
-      acc[option.type] = optionValue.id
+      acc[attribute.type] = optionValue.id
     }
 
     return acc
@@ -88,9 +96,9 @@ export function ShopProductConfigurator({
     setQuantity(1)
   }, [product.id])
 
-  const productOptions = useMemo(
-    () => (product.productOptions ?? []).filter((option) => option.values.length > 0),
-    [product.productOptions]
+  const productAttributes = useMemo(
+    () => (product.attributes ?? []).filter((attribute) => attribute.values.length > 0),
+    [product.attributes]
   )
   const selectedVariant = useMemo(
     () => findMatchingVariant(product.variants, selectedOptions),
@@ -99,13 +107,15 @@ export function ShopProductConfigurator({
 
   const displayImage = selectedVariant?.image || product.image
   const displayPrice = selectedVariant?.price ?? product.price
-  const requiresOptionSelection = productOptions.length > 0
+  const requiresOptionSelection = productAttributes.length > 0
+  const requiresVariantMatch = (product.variants?.length ?? 0) > 0
   const canAddToCart =
-    !requiresOptionSelection ||
-    productOptions.every((option) => Boolean(selectedOptions[option.type]))
+    (!requiresOptionSelection ||
+      productAttributes.every((attribute) => Boolean(selectedOptions[attribute.type]))) &&
+    (!requiresVariantMatch || !requiresOptionSelection || Boolean(selectedVariant))
   const selectedOptionValueIds = useMemo(
-    () => getSelectedOptionValueIds(productOptions, selectedOptions),
-    [productOptions, selectedOptions]
+    () => getSelectedOptionValueIds(productAttributes, selectedOptions, selectedVariant),
+    [productAttributes, selectedOptions, selectedVariant]
   )
 
   const handleAddToCart = () => {
@@ -166,30 +176,25 @@ export function ShopProductConfigurator({
             </p>
           </div>
 
-          {productOptions.map((option) => (
-            <div key={`${product.id}-${option.id}`}>
+          {productAttributes.map((attribute) => (
+            <div key={`${product.id}-${attribute.id}`}>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="font-medium text-gray-800">{option.label}</p>
-                {option.values.find((value) => value.value === selectedOptions[option.type])?.label ? (
-                  <p className="text-sm text-gray-500">
-                    {option.values.find((value) => value.value === selectedOptions[option.type])?.label}
-                  </p>
-                ) : null}
+                <p className="font-medium text-gray-800">{attribute.name}</p>
               </div>
 
-              {isColorOption(option) ? (
+              {isColorOption(attribute) ? (
                 <div className="flex flex-wrap gap-3">
-                  {option.values.map((value) => {
-                    const isSelected = selectedOptions[option.type] === value.value
+                  {attribute.values.map((value) => {
+                    const isSelected = selectedOptions[attribute.type] === value.value
 
                     return (
                       <button
-                        key={`${product.id}-${option.type}-${value.value}`}
+                        key={`${product.id}-${attribute.type}-${value.value}`}
                         type="button"
                         onClick={() =>
                           setSelectedOptions((current) => ({
                             ...current,
-                            [option.type]: value.value,
+                            [attribute.type]: value.value,
                           }))
                         }
                         className={`flex flex-col items-center gap-2 rounded-2xl border px-3 py-3 transition-colors ${
@@ -198,13 +203,13 @@ export function ShopProductConfigurator({
                             : 'border-brand-300 bg-white hover:bg-brand-75'
                         }`}
                         aria-pressed={isSelected}
-                        aria-label={`Seleccionar ${option.label} ${value.label}`}
+                        aria-label={`Seleccionar ${attribute.name} ${value.label}`}
                       >
                         <span
                           className={`h-9 w-9 rounded-full border-2 ${
                             isSelected ? 'border-brand-500' : 'border-black/10'
                           } ${getColorOptionClass(value.value)}`}
-                          style={getColorOptionStyle(value.hexColor)}
+                          style={getColorOptionStyle(value.hex ?? value.hexColor)}
                           aria-hidden="true"
                         />
                         <span className="text-xs font-medium capitalize text-brand-800">
@@ -216,17 +221,17 @@ export function ShopProductConfigurator({
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {option.values.map((value) => {
-                    const isSelected = selectedOptions[option.type] === value.value
+                  {attribute.values.map((value) => {
+                    const isSelected = selectedOptions[attribute.type] === value.value
 
                     return (
                       <button
-                        key={`${product.id}-${option.type}-${value.value}`}
+                        key={`${product.id}-${attribute.type}-${value.value}`}
                         type="button"
                         onClick={() =>
                           setSelectedOptions((current) => ({
                             ...current,
-                            [option.type]: value.value,
+                            [attribute.type]: value.value,
                           }))
                         }
                         className={`inline-flex items-center rounded-full border px-4 py-2 text-sm transition-colors ${

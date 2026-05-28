@@ -6,7 +6,6 @@ export const strapiEndpoints = {
   landing: 'api/landing',
   promoBanner: 'api/promo-banner',
   products: 'api/products',
-  productVariants: 'api/product-variants',
   featuredProduct: 'api/featured-product',
   categories: 'api/categories',
   faqs: 'api/faqs',
