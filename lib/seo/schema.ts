@@ -1,4 +1,4 @@
-import type { FaqItem, FooterContent } from '@/lib/api/contracts'
+import type { FaqItem, FooterContent, Product } from '@/lib/api/contracts'
 
 import { absoluteUrl, siteMetadata } from '@/lib/seo/metadata'
 
@@ -47,5 +47,28 @@ export function buildFaqSchema(faqs: FaqItem[]) {
         text: faq.answer,
       },
     })),
+  }
+}
+
+export function buildProductSchema(product: Product) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description || siteMetadata.description,
+    image: [product.ogImage || product.image].filter(Boolean),
+    sku: product.strapiId || product.id,
+    category: product.categories?.map((category) => category.name).join(', ') || undefined,
+    brand: {
+      '@type': 'Brand',
+      name: siteMetadata.name,
+    },
+    offers: {
+      '@type': 'Offer',
+      url: absoluteUrl(`/shop/${product.slug || product.id}`),
+      priceCurrency: 'USD',
+      price: product.price.toFixed(2),
+      availability: 'https://schema.org/InStock',
+    },
   }
 }
