@@ -487,8 +487,8 @@ export default function CheckoutPage() {
       customer: customerValues,
       shipping: {
         ...buildCheckoutShippingAddressPayload(safeShippingValues),
-        ...(safeShippingValues.selectedShippingOptionId?.trim()
-          ? { selectedShippingOptionId: safeShippingValues.selectedShippingOptionId }
+        ...(effectiveSelectedShippingOptionId
+          ? { selectedShippingOptionId: effectiveSelectedShippingOptionId }
           : {}),
       },
       billing: buildCheckoutShippingAddressPayload(safeShippingValues),
@@ -509,15 +509,19 @@ export default function CheckoutPage() {
     !quoteError &&
     canRequestQuote &&
     quote.totals.shipping <= 0
+  const freeShippingOption =
+    availableShippingOptions.find((option) => option.amount <= 0) ?? null
+  const hasShippingException = quoteHasFreeShippingOverride && !!freeShippingOption
+  const effectiveSelectedShippingOptionId =
+    selectedShippingOptionId || (hasShippingException ? freeShippingOption?.id ?? '' : '')
   const requiresShippingSelection =
-    !quoteHasFreeShippingOverride && availableShippingOptions.length > 0
+    !hasShippingException && availableShippingOptions.length > 0
   const shippingSelectionSatisfied =
     !requiresShippingSelection ||
-    availableShippingOptions.some((option) => option.id === selectedShippingOptionId)
-  const hasShippingException = quoteHasFreeShippingOverride
+    availableShippingOptions.some((option) => option.id === effectiveSelectedShippingOptionId)
   const selectedShippingOption =
     paymentSession?.selectedShippingOption ??
-    availableShippingOptions.find((option) => option.id === selectedShippingOptionId) ??
+    availableShippingOptions.find((option) => option.id === effectiveSelectedShippingOptionId) ??
     null
   const displayTotals = paymentSession?.totals ?? quote?.totals ?? null
   const canInitializePayment =
@@ -1034,6 +1038,21 @@ export default function CheckoutPage() {
       }
     }
   }, [appliedDiscountCode, canInitializePayment, customerValues, items, quote, safeShippingValues])
+
+  useEffect(() => {
+    if (!hasShippingException || !freeShippingOption) {
+      return
+    }
+
+    if (selectedShippingOptionId === freeShippingOption.id) {
+      return
+    }
+
+    form.setValue('shipping.selectedShippingOptionId', freeShippingOption.id, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }, [form, freeShippingOption, hasShippingException, selectedShippingOptionId])
 
   useEffect(() => {
     if (!customerComplete) {
