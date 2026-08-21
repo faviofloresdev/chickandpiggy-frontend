@@ -91,10 +91,7 @@ export const checkoutPaymentIntentRequestSchema = z.object({
   items: checkoutItemsSchema,
   customer: checkoutCustomerSchema,
   shipping: checkoutShippingSchema.extend({
-    selectedShippingOptionId: z
-      .string()
-      .trim()
-      .min(1, 'Please choose a shipping option before continuing.'),
+    selectedShippingOptionId: z.string().trim().optional(),
     googleValidatedAddress: z.boolean().optional(),
   }).omit({
     googleValidatedAddress: true,
