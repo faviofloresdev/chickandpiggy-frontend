@@ -14,7 +14,7 @@ export function ProductCard({
   product,
   showDescription = false,
 }: ProductCardProps) {
-  const productHref = `/shop?product=${encodeURIComponent(product.slug || product.id)}#selected-product`
+  const productHref = `/shop/${encodeURIComponent(product.slug || product.id)}`
   const optionGroups = useMemo(
     () => (product.attributes ?? []).filter((option) => option.values.length > 0),
     [product.attributes]

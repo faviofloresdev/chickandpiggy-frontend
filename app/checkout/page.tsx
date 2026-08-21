@@ -92,6 +92,9 @@ function parseGoogleAddressComponents(place: any) {
 
   const streetNumber = getComponent('street_number')
   const route = getComponent('route')
+  const subpremise = getComponent('subpremise')
+  const floor = getComponent('floor')
+  const room = getComponent('room')
   const city =
     getComponent('locality') ||
     getComponent('postal_town') ||
@@ -103,12 +106,24 @@ function parseGoogleAddressComponents(place: any) {
 
   return {
     addressLine1: [streetNumber, route].filter(Boolean).join(' ').trim(),
+    addressLine2: [subpremise, floor, room].filter(Boolean).join(', ').trim(),
     city,
     state,
     postalCode,
     country,
     formattedAddress: String(place?.formatted_address ?? '').trim(),
   }
+}
+
+function buildAddressSummaryLines(shipping: CheckoutFormValues['shipping']) {
+  const line1 = shipping.addressLine1.trim()
+  const line2 = shipping.addressLine2?.trim() ?? ''
+  const localityLine = [shipping.city, shipping.state, shipping.postalCode]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(', ')
+
+  return [line1, line2, localityLine].filter(Boolean)
 }
 
 function getDeliveryEstimateText(option: CheckoutShippingOption) {
@@ -351,13 +366,9 @@ export default function CheckoutPage() {
   const [activeStep, setActiveStep] = useState<CheckoutStepId>('customer')
   const addressLine1InputRef = useRef<HTMLInputElement | null>(null)
   const autocompleteRef = useRef<any>(null)
+  const autocompleteInputRef = useRef<HTMLInputElement | null>(null)
   const persistedOrderIdRef = useRef<number | null>(null)
   const persistedPaymentIntentIdRef = useRef<string | null>(null)
-  const completionRef = useRef({
-    customer: false,
-    address: false,
-    shipping: false,
-  })
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
@@ -442,6 +453,7 @@ export default function CheckoutPage() {
     safeShippingValues.postalCode,
     safeShippingValues.country,
   ]
+  const shippingAddressSummaryLines = buildAddressSummaryLines(safeShippingValues)
   const checkoutItemsPayload = useMemo(() => buildCheckoutItemsPayload(items), [items])
   const hasInvalidCartItems = checkoutItemsPayload.length !== items.length
   const cartIntegrityError = hasInvalidCartItems ? INVALID_CART_MESSAGE : null
@@ -676,15 +688,24 @@ export default function CheckoutPage() {
         return
       }
 
-      if (!autocompleteRef.current) {
+      const activeInput = addressLine1InputRef.current
+      const shouldCreateAutocomplete =
+        !autocompleteRef.current || autocompleteInputRef.current !== activeInput
+
+      if (shouldCreateAutocomplete) {
+        if (autocompleteRef.current && window.google?.maps?.event) {
+          window.google.maps.event.clearInstanceListeners(autocompleteRef.current)
+        }
+
         autocompleteRef.current = new window.google.maps.places.Autocomplete(
-          addressLine1InputRef.current,
+          activeInput,
           {
             fields: ['address_components', 'formatted_address'],
             types: ['address'],
             componentRestrictions: { country: 'us' },
           }
         )
+        autocompleteInputRef.current = activeInput
 
         autocompleteRef.current.addListener('place_changed', () => {
           const place = autocompleteRef.current.getPlace()
@@ -698,6 +719,12 @@ export default function CheckoutPage() {
             shouldDirty: true,
             shouldValidate: true,
           })
+          if (parsedAddress.addressLine2) {
+            form.setValue('shipping.addressLine2', parsedAddress.addressLine2, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }
           form.setValue('shipping.city', parsedAddress.city, {
             shouldDirty: true,
             shouldValidate: true,
@@ -784,6 +811,14 @@ export default function CheckoutPage() {
       script.onerror = null
     }
   }, [activeStep, form])
+
+  useEffect(() => {
+    return () => {
+      if (autocompleteRef.current && window.google?.maps?.event) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     setPaymentSession(null)
@@ -985,8 +1020,6 @@ export default function CheckoutPage() {
   }, [appliedDiscountCode, canInitializePayment, customerValues, items, quote, safeShippingValues])
 
   useEffect(() => {
-    const previous = completionRef.current
-
     if (!customerComplete) {
       if (activeStep !== 'customer') {
         setActiveStep('customer')
@@ -994,23 +1027,11 @@ export default function CheckoutPage() {
     } else if (!addressComplete) {
       if (getStepIndex(activeStep) > getStepIndex('address')) {
         setActiveStep('address')
-      } else if (!previous.customer && activeStep === 'customer') {
-        setActiveStep('address')
       }
     } else if (!shippingComplete) {
       if (getStepIndex(activeStep) > getStepIndex('shipping')) {
         setActiveStep('shipping')
-      } else if (!previous.address && activeStep === 'address') {
-        setActiveStep('shipping')
       }
-    } else if (!previous.shipping && activeStep === 'shipping') {
-      setActiveStep('payment')
-    }
-
-    completionRef.current = {
-      customer: customerComplete,
-      address: addressComplete,
-      shipping: shippingComplete,
     }
   }, [activeStep, addressComplete, customerComplete, shippingComplete])
 
@@ -1237,6 +1258,20 @@ export default function CheckoutPage() {
                       placeholder="Apartment, suite, unit, building, floor, etc."
                       {...form.register('shipping.addressLine2')}
                     />
+                    {googleStatus === 'ready' && addressValidated ? (
+                      <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+                        <p className="font-medium">Selected address</p>
+                        {shippingAddressSummaryLines.map((line) => (
+                          <p key={line}>{line}</p>
+                        ))}
+                        {!safeShippingValues.addressLine2.trim() ? (
+                          <p className="mt-2 text-brand-700">
+                            If your Google suggestion included an apartment, suite, or unit,
+                            confirm it here before continuing.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -1584,6 +1619,14 @@ export default function CheckoutPage() {
             </div>
 
             <div className="space-y-4 border-t border-gray-100 pt-6">
+              {shippingAddressSummaryLines.length > 0 ? (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+                  <p className="mb-2 font-medium text-gray-800">Ship to</p>
+                  {shippingAddressSummaryLines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              ) : null}
               <div className="flex justify-between">
                 <p className="text-lg font-semibold text-gray-800">Total</p>
                 <p className="text-lg font-semibold text-brand-700">
