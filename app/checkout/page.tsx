@@ -453,6 +453,7 @@ export default function CheckoutPage() {
     safeShippingValues.postalCode,
     safeShippingValues.country,
   ]
+  const addressLine2Value = safeShippingValues.addressLine2?.trim() ?? ''
   const shippingAddressSummaryLines = buildAddressSummaryLines(safeShippingValues)
   const checkoutItemsPayload = useMemo(() => buildCheckoutItemsPayload(items), [items])
   const hasInvalidCartItems = checkoutItemsPayload.length !== items.length
@@ -1264,7 +1265,7 @@ export default function CheckoutPage() {
                         {shippingAddressSummaryLines.map((line) => (
                           <p key={line}>{line}</p>
                         ))}
-                        {!safeShippingValues.addressLine2.trim() ? (
+                        {!addressLine2Value ? (
                           <p className="mt-2 text-brand-700">
                             If your Google suggestion included an apartment, suite, or unit,
                             confirm it here before continuing.
