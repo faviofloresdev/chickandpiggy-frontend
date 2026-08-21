@@ -464,13 +464,6 @@ export default function CheckoutPage() {
     !hasInvalidCartItems &&
     manualLocationFields.every((value) => value.trim().length > 0) &&
     (!usesGoogleManagedAddress || !!addressValidated)
-  const canInitializePayment =
-    !hasInvalidCartItems &&
-    form.formState.isValid &&
-    !!selectedShippingOptionId &&
-    !!quote &&
-    !!checkoutSessionToken &&
-    (!usesGoogleManagedAddress || !!addressValidated)
   const canApplyDiscount =
     checkoutItemsPayload.length > 0 &&
     !hasInvalidCartItems &&
@@ -494,7 +487,9 @@ export default function CheckoutPage() {
       customer: customerValues,
       shipping: {
         ...buildCheckoutShippingAddressPayload(safeShippingValues),
-        selectedShippingOptionId: safeShippingValues.selectedShippingOptionId,
+        ...(safeShippingValues.selectedShippingOptionId?.trim()
+          ? { selectedShippingOptionId: safeShippingValues.selectedShippingOptionId }
+          : {}),
       },
       billing: buildCheckoutShippingAddressPayload(safeShippingValues),
       ...(appliedDiscountCode ? { discountCode: appliedDiscountCode } : {}),
@@ -508,11 +503,30 @@ export default function CheckoutPage() {
 
   const availableShippingOptions =
     paymentSession?.shippingOptions?.length ? paymentSession.shippingOptions : quote?.shippingOptions ?? []
+  const quoteHasFreeShippingOverride =
+    !!quote &&
+    !isLoadingQuote &&
+    !quoteError &&
+    canRequestQuote &&
+    quote.totals.shipping <= 0
+  const requiresShippingSelection =
+    !quoteHasFreeShippingOverride && availableShippingOptions.length > 0
+  const shippingSelectionSatisfied =
+    !requiresShippingSelection ||
+    availableShippingOptions.some((option) => option.id === selectedShippingOptionId)
+  const hasShippingException = quoteHasFreeShippingOverride
   const selectedShippingOption =
     paymentSession?.selectedShippingOption ??
     availableShippingOptions.find((option) => option.id === selectedShippingOptionId) ??
     null
   const displayTotals = paymentSession?.totals ?? quote?.totals ?? null
+  const canInitializePayment =
+    !hasInvalidCartItems &&
+    form.formState.isValid &&
+    !!quote &&
+    !!checkoutSessionToken &&
+    shippingSelectionSatisfied &&
+    (!usesGoogleManagedAddress || !!addressValidated)
   const subtotal = quote?.totals.subtotal ?? getSubtotal()
   const backendDiscountAmount = displayTotals?.discount ?? appliedDiscount?.amount ?? 0
   const derivedPercentageDiscountAmount =
@@ -547,8 +561,7 @@ export default function CheckoutPage() {
     !form.formState.errors.shipping?.state &&
     !form.formState.errors.shipping?.postalCode
   const shippingComplete =
-    !!selectedShippingOptionId &&
-    availableShippingOptions.some((option) => option.id === selectedShippingOptionId)
+    shippingSelectionSatisfied && (requiresShippingSelection || hasShippingException)
   const paymentReady = canInitializePayment && !!paymentSession?.clientSecret && !isLoadingPayment
   const steps = [
     {
@@ -573,10 +586,12 @@ export default function CheckoutPage() {
       id: 'shipping' as const,
       label: 'Shipping',
       helper: shippingComplete
-        ? selectedShippingOption?.label ??
-          [selectedShippingOption?.carrier, selectedShippingOption?.service]
-            .filter(Boolean)
-            .join(' ')
+        ? hasShippingException
+          ? 'Free shipping'
+          : selectedShippingOption?.label ??
+            [selectedShippingOption?.carrier, selectedShippingOption?.service]
+              .filter(Boolean)
+              .join(' ')
         : 'Choose a rate',
       complete: shippingComplete,
       available: customerComplete && addressComplete,
@@ -1405,7 +1420,7 @@ export default function CheckoutPage() {
                     </div>
                   ) : null}
 
-                  {availableShippingOptions.length > 0 ? (
+                  {requiresShippingSelection ? (
                     <RadioGroup
                       value={selectedShippingOptionId}
                       onValueChange={(value) =>
@@ -1450,7 +1465,18 @@ export default function CheckoutPage() {
                     </RadioGroup>
                   ) : null}
 
-                  {form.formState.errors.shipping?.selectedShippingOptionId ? (
+                  {hasShippingException ? (
+                    <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-800">
+                      <p className="font-medium">Free shipping applied for this ZIP code.</p>
+                      <p className="mt-1">
+                        No shipping method selection is required. You can continue to
+                        payment.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {requiresShippingSelection &&
+                  form.formState.errors.shipping?.selectedShippingOptionId ? (
                     <p className="text-sm text-red-600">
                       {form.formState.errors.shipping.selectedShippingOptionId.message}
                     </p>
