@@ -503,17 +503,18 @@ export default function CheckoutPage() {
 
   const availableShippingOptions =
     paymentSession?.shippingOptions?.length ? paymentSession.shippingOptions : quote?.shippingOptions ?? []
-  const requiresShippingSelection = availableShippingOptions.length > 0
-  const shippingSelectionSatisfied =
-    !requiresShippingSelection ||
-    availableShippingOptions.some((option) => option.id === selectedShippingOptionId)
-  const hasShippingException =
+  const quoteHasFreeShippingOverride =
     !!quote &&
     !isLoadingQuote &&
     !quoteError &&
     canRequestQuote &&
-    !requiresShippingSelection &&
     quote.totals.shipping <= 0
+  const requiresShippingSelection =
+    !quoteHasFreeShippingOverride && availableShippingOptions.length > 0
+  const shippingSelectionSatisfied =
+    !requiresShippingSelection ||
+    availableShippingOptions.some((option) => option.id === selectedShippingOptionId)
+  const hasShippingException = quoteHasFreeShippingOverride
   const selectedShippingOption =
     paymentSession?.selectedShippingOption ??
     availableShippingOptions.find((option) => option.id === selectedShippingOptionId) ??
@@ -585,10 +586,12 @@ export default function CheckoutPage() {
       id: 'shipping' as const,
       label: 'Shipping',
       helper: shippingComplete
-        ? selectedShippingOption?.label ??
-          [selectedShippingOption?.carrier, selectedShippingOption?.service]
-            .filter(Boolean)
-            .join(' ')
+        ? hasShippingException
+          ? 'Free shipping'
+          : selectedShippingOption?.label ??
+            [selectedShippingOption?.carrier, selectedShippingOption?.service]
+              .filter(Boolean)
+              .join(' ')
         : 'Choose a rate',
       complete: shippingComplete,
       available: customerComplete && addressComplete,
@@ -1417,7 +1420,7 @@ export default function CheckoutPage() {
                     </div>
                   ) : null}
 
-                  {availableShippingOptions.length > 0 ? (
+                  {requiresShippingSelection ? (
                     <RadioGroup
                       value={selectedShippingOptionId}
                       onValueChange={(value) =>
