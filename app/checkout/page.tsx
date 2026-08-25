@@ -86,9 +86,27 @@ function formatSelectedOptions(item: {
 }
 
 function parseGoogleAddressComponents(place: any) {
-  const components = Array.isArray(place?.address_components) ? place.address_components : []
-  const getComponent = (type: string, valueType: 'long_name' | 'short_name' = 'long_name') =>
-    components.find((component: any) => component.types?.includes(type))?.[valueType] ?? ''
+  const components = Array.isArray(place?.addressComponents)
+    ? place.addressComponents
+    : Array.isArray(place?.address_components)
+      ? place.address_components
+      : []
+  const getComponent = (
+    type: string,
+    valueType: 'long' | 'short' = 'long'
+  ) => {
+    const component = components.find((entry: any) => entry.types?.includes(type))
+
+    if (!component) {
+      return ''
+    }
+
+    if (valueType === 'short') {
+      return String(component.shortText ?? component.short_name ?? '').trim()
+    }
+
+    return String(component.longText ?? component.long_name ?? '').trim()
+  }
 
   const streetNumber = getComponent('street_number')
   const route = getComponent('route')
@@ -100,9 +118,9 @@ function parseGoogleAddressComponents(place: any) {
     getComponent('postal_town') ||
     getComponent('sublocality_level_1') ||
     getComponent('administrative_area_level_2')
-  const state = getComponent('administrative_area_level_1', 'short_name')
+  const state = getComponent('administrative_area_level_1', 'short')
   const postalCode = getComponent('postal_code')
-  const country = getComponent('country', 'short_name') || 'US'
+  const country = getComponent('country', 'short') || 'US'
 
   return {
     addressLine1: [streetNumber, route].filter(Boolean).join(' ').trim(),
@@ -111,7 +129,7 @@ function parseGoogleAddressComponents(place: any) {
     state,
     postalCode,
     country,
-    formattedAddress: String(place?.formatted_address ?? '').trim(),
+    formattedAddress: String(place?.formattedAddress ?? place?.formatted_address ?? '').trim(),
   }
 }
 
@@ -365,8 +383,9 @@ export default function CheckoutPage() {
   const [isLoadingPayment, setIsLoadingPayment] = useState(false)
   const [activeStep, setActiveStep] = useState<CheckoutStepId>('customer')
   const addressLine1InputRef = useRef<HTMLInputElement | null>(null)
+  const addressAutocompleteContainerRef = useRef<HTMLDivElement | null>(null)
   const autocompleteRef = useRef<any>(null)
-  const autocompleteInputRef = useRef<HTMLInputElement | null>(null)
+  const autocompleteCleanupRef = useRef<(() => void) | null>(null)
   const persistedOrderIdRef = useRef<number | null>(null)
   const persistedPaymentIntentIdRef = useRef<string | null>(null)
 
@@ -408,30 +427,43 @@ export default function CheckoutPage() {
     control: form.control,
     name: 'shipping.googleValidatedAddress',
   })
-  const usesGoogleManagedAddress = googleStatus === 'ready'
-  const addressLine1Field = form.register('shipping.addressLine1', {
-    onChange: () => {
-      if (usesGoogleManagedAddress) {
-        form.setValue('shipping.city', '', {
-          shouldDirty: true,
-          shouldValidate: true,
-        })
-        form.setValue('shipping.state', '', {
-          shouldDirty: true,
-          shouldValidate: true,
-        })
-        form.setValue('shipping.postalCode', '', {
-          shouldDirty: true,
-          shouldValidate: true,
-        })
-      }
-      form.setValue('shipping.googleValidatedAddress', false, {
-        shouldDirty: true,
-      })
-      form.setValue('shipping.selectedShippingOptionId', '', {
+  const googleAutocompleteAvailable = googleStatus === 'ready'
+  const usesGoogleManagedAddress = googleAutocompleteAvailable && !!addressValidated
+  const shouldRenderGoogleAddressInput =
+    googleStatus === 'loading' || googleStatus === 'ready'
+
+  function resetManagedAddressSelection(resetLocationFields: boolean) {
+    if (resetLocationFields) {
+      form.setValue('shipping.city', '', {
         shouldDirty: true,
         shouldValidate: true,
       })
+      form.setValue('shipping.state', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      form.setValue('shipping.postalCode', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+    }
+
+    form.setValue('shipping.googleValidatedAddress', false, {
+      shouldDirty: true,
+    })
+    form.setValue('shipping.selectedShippingOptionId', '', {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }
+
+  const addressLine1Field = form.register('shipping.addressLine1', {
+    onChange: () => {
+      if (googleAutocompleteAvailable) {
+        resetManagedAddressSelection(true)
+        return
+      }
+      resetManagedAddressSelection(false)
     },
   })
 
@@ -462,8 +494,7 @@ export default function CheckoutPage() {
   const canRequestQuote =
     checkoutItemsPayload.length > 0 &&
     !hasInvalidCartItems &&
-    manualLocationFields.every((value) => value.trim().length > 0) &&
-    (!usesGoogleManagedAddress || !!addressValidated)
+    manualLocationFields.every((value) => value.trim().length > 0)
   const canApplyDiscount =
     checkoutItemsPayload.length > 0 &&
     !hasInvalidCartItems &&
@@ -529,8 +560,7 @@ export default function CheckoutPage() {
     form.formState.isValid &&
     !!quote &&
     !!checkoutSessionToken &&
-    shippingSelectionSatisfied &&
-    (!usesGoogleManagedAddress || !!addressValidated)
+    shippingSelectionSatisfied
   const subtotal = quote?.totals.subtotal ?? getSubtotal()
   const backendDiscountAmount = displayTotals?.discount ?? appliedDiscount?.amount ?? 0
   const derivedPercentageDiscountAmount =
@@ -608,6 +638,12 @@ export default function CheckoutPage() {
       available: customerComplete && addressComplete && shippingComplete,
     },
   ]
+
+  useEffect(() => {
+    if (autocompleteRef.current) {
+      autocompleteRef.current.value = safeShippingValues.addressLine1 ?? ''
+    }
+  }, [safeShippingValues.addressLine1])
 
   async function handleApplyDiscount() {
     const nextCode = discountCode.trim()
@@ -703,32 +739,52 @@ export default function CheckoutPage() {
       return
     }
 
-    const initializeAutocomplete = () => {
-      if (!addressLine1InputRef.current || !window.google?.maps?.places) {
+    const initializeAutocomplete = async () => {
+      if (!addressAutocompleteContainerRef.current || !window.google?.maps?.importLibrary) {
         return
       }
 
-      const activeInput = addressLine1InputRef.current
-      const shouldCreateAutocomplete =
-        !autocompleteRef.current || autocompleteInputRef.current !== activeInput
+      const { PlaceAutocompleteElement } = (await window.google.maps.importLibrary(
+        'places'
+      )) as any
 
-      if (shouldCreateAutocomplete) {
-        if (autocompleteRef.current && window.google?.maps?.event) {
-          window.google.maps.event.clearInstanceListeners(autocompleteRef.current)
+      if (!PlaceAutocompleteElement) {
+        setGoogleStatus('error')
+        return
+      }
+
+      if (!autocompleteRef.current) {
+        const placeAutocomplete = new PlaceAutocompleteElement({
+          includedRegionCodes: ['us'],
+          placeholder: 'Start typing your shipping address',
+          value: form.getValues('shipping.addressLine1') ?? '',
+        })
+
+        placeAutocomplete.className =
+          'block w-full rounded-xl border border-input bg-transparent text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
+        placeAutocomplete.setAttribute('aria-label', 'Street address')
+
+        const handleInput = (event: Event) => {
+          const target = event.currentTarget as any
+          form.setValue('shipping.addressLine1', String(target?.value ?? '').trimStart(), {
+            shouldDirty: true,
+            shouldValidate: true,
+          })
+          resetManagedAddressSelection(true)
         }
 
-        autocompleteRef.current = new window.google.maps.places.Autocomplete(
-          activeInput,
-          {
-            fields: ['address_components', 'formatted_address'],
-            types: ['address'],
-            componentRestrictions: { country: 'us' },
-          }
-        )
-        autocompleteInputRef.current = activeInput
+        const handleSelect = async (event: Event) => {
+          const placePrediction = (event as any).placePrediction
 
-        autocompleteRef.current.addListener('place_changed', () => {
-          const place = autocompleteRef.current.getPlace()
+          if (!placePrediction?.toPlace) {
+            return
+          }
+
+          const place = placePrediction.toPlace()
+          await place.fetchFields({
+            fields: ['addressComponents', 'formattedAddress'],
+          })
+
           const parsedAddress = parseGoogleAddressComponents(place)
 
           if (!parsedAddress.addressLine1) {
@@ -739,12 +795,11 @@ export default function CheckoutPage() {
             shouldDirty: true,
             shouldValidate: true,
           })
-          if (parsedAddress.addressLine2) {
-            form.setValue('shipping.addressLine2', parsedAddress.addressLine2, {
-              shouldDirty: true,
-              shouldValidate: true,
-            })
-          }
+          placeAutocomplete.value = parsedAddress.addressLine1
+          form.setValue('shipping.addressLine2', parsedAddress.addressLine2, {
+            shouldDirty: true,
+            shouldValidate: true,
+          })
           form.setValue('shipping.city', parsedAddress.city, {
             shouldDirty: true,
             shouldValidate: true,
@@ -770,21 +825,41 @@ export default function CheckoutPage() {
             shouldValidate: true,
           })
           form.clearErrors('shipping.addressLine1')
-        })
+        }
+
+        const handleError = () => setGoogleStatus('error')
+
+        placeAutocomplete.addEventListener('input', handleInput)
+        placeAutocomplete.addEventListener('gmp-select', handleSelect as EventListener)
+        placeAutocomplete.addEventListener('gmp-error', handleError)
+
+        addressAutocompleteContainerRef.current.innerHTML = ''
+        addressAutocompleteContainerRef.current.appendChild(placeAutocomplete)
+
+        autocompleteRef.current = placeAutocomplete
+        autocompleteCleanupRef.current = () => {
+          placeAutocomplete.removeEventListener('input', handleInput)
+          placeAutocomplete.removeEventListener('gmp-select', handleSelect as EventListener)
+          placeAutocomplete.removeEventListener('gmp-error', handleError)
+        }
+      } else {
+        autocompleteRef.current.value = form.getValues('shipping.addressLine1') ?? ''
       }
 
       setGoogleStatus('ready')
     }
+
     const handleScriptError = () => setGoogleStatus('error')
     const loadTimeout = window.setTimeout(() => {
-      if (!window.google?.maps?.places) {
+      if (!window.google?.maps?.importLibrary) {
         setGoogleStatus('error')
       }
     }, 10000)
 
-    if (window.google?.maps?.places) {
-      initializeAutocomplete()
-      window.clearTimeout(loadTimeout)
+    if (window.google?.maps?.importLibrary) {
+      void initializeAutocomplete().finally(() => {
+        window.clearTimeout(loadTimeout)
+      })
       return () => {
         window.clearTimeout(loadTimeout)
       }
@@ -796,19 +871,24 @@ export default function CheckoutPage() {
 
     if (existingScript) {
       if (existingScript.dataset.loaded === 'true') {
-        initializeAutocomplete()
-        window.clearTimeout(loadTimeout)
+        void initializeAutocomplete().finally(() => {
+          window.clearTimeout(loadTimeout)
+        })
         return () => {
           window.clearTimeout(loadTimeout)
         }
       }
 
-      existingScript.addEventListener('load', initializeAutocomplete)
+      const handleLoad = () => {
+        void initializeAutocomplete()
+      }
+
+      existingScript.addEventListener('load', handleLoad)
       existingScript.addEventListener('error', handleScriptError)
 
       return () => {
         window.clearTimeout(loadTimeout)
-        existingScript.removeEventListener('load', initializeAutocomplete)
+        existingScript.removeEventListener('load', handleLoad)
         existingScript.removeEventListener('error', handleScriptError)
       }
     }
@@ -820,7 +900,7 @@ export default function CheckoutPage() {
     script.defer = true
     script.onload = () => {
       script.dataset.loaded = 'true'
-      initializeAutocomplete()
+      void initializeAutocomplete()
     }
     script.onerror = handleScriptError
     document.body.appendChild(script)
@@ -834,9 +914,9 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     return () => {
-      if (autocompleteRef.current && window.google?.maps?.event) {
-        window.google.maps.event.clearInstanceListeners(autocompleteRef.current)
-      }
+      autocompleteCleanupRef.current?.()
+      autocompleteCleanupRef.current = null
+      autocompleteRef.current = null
     }
   }, [])
 
@@ -1246,15 +1326,23 @@ export default function CheckoutPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="shipping-address-line-1">Street address</Label>
-                    <Input
-                      id="shipping-address-line-1"
-                      placeholder="Start typing your shipping address"
-                      {...addressLine1Field}
-                      ref={(element) => {
-                        addressLine1Field.ref(element)
-                        addressLine1InputRef.current = element
-                      }}
-                    />
+                    {shouldRenderGoogleAddressInput ? (
+                      <div
+                        id="shipping-address-line-1"
+                        ref={addressAutocompleteContainerRef}
+                        className="rounded-xl border border-input bg-transparent shadow-xs focus-within:ring-[3px] focus-within:ring-ring/50"
+                      />
+                    ) : (
+                      <Input
+                        id="shipping-address-line-1"
+                        placeholder="Start typing your shipping address"
+                        {...addressLine1Field}
+                        ref={(element) => {
+                          addressLine1Field.ref(element)
+                          addressLine1InputRef.current = element
+                        }}
+                      />
+                    )}
                     {googleStatus === 'loading' ? (
                       <p className="flex items-center gap-2 text-sm text-gray-500">
                         <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1421,7 +1509,7 @@ export default function CheckoutPage() {
                     <div className="rounded-2xl border border-dashed border-brand-350 bg-brand-50 px-4 py-6 text-sm text-gray-500">
                       {cartIntegrityError
                         ? cartIntegrityError
-                        : usesGoogleManagedAddress
+                        : googleAutocompleteAvailable && !addressValidated
                          ? 'Select a suggested address to load taxes and shipping options.'
                          : 'Complete the shipping address to request live rates.'}
                     </div>

@@ -25,10 +25,10 @@ const strapiAssetPattern = (() => {
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ''} https://js.stripe.com https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://va.vercel-scripts.com`,
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   `img-src 'self' data: blob: https:${strapiOrigin ? ` ${strapiOrigin}` : ''}`,
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://maps.gstatic.com https://www.google-analytics.com https://region1.google-analytics.com https://vitals.vercel-insights.com",
+  "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://maps.gstatic.com https://places.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://vitals.vercel-insights.com",
   "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
   "form-action 'self' https://js.stripe.com https://hooks.stripe.com",
   "base-uri 'self'",
