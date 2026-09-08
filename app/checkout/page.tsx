@@ -388,6 +388,11 @@ export default function CheckoutPage() {
   const autocompleteCleanupRef = useRef<(() => void) | null>(null)
   const persistedOrderIdRef = useRef<number | null>(null)
   const persistedPaymentIntentIdRef = useRef<string | null>(null)
+  const previousStepCompletionRef = useRef({
+    customer: false,
+    address: false,
+    shipping: false,
+  })
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
@@ -1133,6 +1138,42 @@ export default function CheckoutPage() {
       shouldValidate: true,
     })
   }, [form, freeShippingOption, hasShippingException, selectedShippingOptionId])
+
+  useEffect(() => {
+    const previousCompletion = previousStepCompletionRef.current
+
+    previousStepCompletionRef.current = {
+      customer: customerComplete,
+      address: addressComplete,
+      shipping: shippingComplete,
+    }
+
+    if (
+      activeStep === 'customer' &&
+      customerComplete &&
+      !previousCompletion.customer
+    ) {
+      setActiveStep('address')
+      return
+    }
+
+    if (
+      activeStep === 'address' &&
+      addressComplete &&
+      !previousCompletion.address
+    ) {
+      setActiveStep('shipping')
+      return
+    }
+
+    if (
+      activeStep === 'shipping' &&
+      shippingComplete &&
+      !previousCompletion.shipping
+    ) {
+      setActiveStep('payment')
+    }
+  }, [activeStep, addressComplete, customerComplete, shippingComplete])
 
   useEffect(() => {
     if (!customerComplete) {
