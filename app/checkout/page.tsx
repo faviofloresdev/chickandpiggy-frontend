@@ -49,6 +49,7 @@ const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const INVALID_CART_MESSAGE =
   'Your cart contains an item we could not verify. Remove it and add it again before checking out.'
 const CHECKOUT_ERROR_MESSAGE = 'We could not process checkout.'
+const QUOTE_ERROR_MESSAGE = 'We could not calculate shipping for this address.'
 const CART_CHANGED_ERROR_MESSAGE = 'Your cart changed. Please try again.'
 const DISCOUNT_ERROR_MESSAGE = 'We could not apply the discount.'
 const RATE_LIMIT_ERROR_MESSAGE = 'Too many requests. Please try again in a few minutes.'
@@ -484,13 +485,6 @@ export default function CheckoutPage() {
     googleValidatedAddress: false,
   }
 
-  const manualLocationFields = [
-    safeShippingValues.addressLine1,
-    safeShippingValues.city,
-    safeShippingValues.state,
-    safeShippingValues.postalCode,
-    safeShippingValues.country,
-  ]
   const addressLine2Value = safeShippingValues.addressLine2?.trim() ?? ''
   const shippingAddressSummaryLines = buildAddressSummaryLines(safeShippingValues)
   const checkoutItemsPayload = useMemo(() => buildCheckoutItemsPayload(items), [items])
@@ -500,7 +494,7 @@ export default function CheckoutPage() {
   const canRequestQuote =
     checkoutItemsPayload.length > 0 &&
     !hasInvalidCartItems &&
-    manualLocationFields.every((value) => value.trim().length > 0)
+    checkoutShippingSchema.safeParse(safeShippingValues).success
   const canApplyDiscount =
     checkoutItemsPayload.length > 0 &&
     !hasInvalidCartItems &&
@@ -623,10 +617,14 @@ export default function CheckoutPage() {
     {
       id: 'address' as const,
       label: 'Address',
-      helper: addressComplete
+      helper: addressReadyForShipping
         ? `${safeShippingValues.city}, ${safeShippingValues.state}`
-        : 'Shipping address',
-      complete: addressComplete,
+        : addressComplete && isLoadingQuote
+          ? 'Loading rates'
+          : quoteError
+            ? 'Check address'
+            : 'Shipping address',
+      complete: addressReadyForShipping,
       available: customerComplete,
     },
     {
@@ -641,7 +639,7 @@ export default function CheckoutPage() {
               .join(' ')
         : 'Choose a rate',
       complete: shippingComplete,
-      available: customerComplete && addressComplete,
+      available: customerComplete && addressReadyForShipping,
     },
     {
       id: 'payment' as const,
@@ -776,6 +774,15 @@ export default function CheckoutPage() {
         return
       }
 
+      if (
+        autocompleteRef.current &&
+        autocompleteRef.current.parentElement !== autocompleteContainer
+      ) {
+        autocompleteCleanupRef.current?.()
+        autocompleteCleanupRef.current = null
+        autocompleteRef.current = null
+      }
+
       if (!autocompleteRef.current) {
         const placeAutocomplete = new PlaceAutocompleteElement({
           includedRegionCodes: ['us'],
@@ -866,10 +873,6 @@ export default function CheckoutPage() {
           placeAutocomplete.removeEventListener('gmp-error', handleError)
         }
       } else {
-        if (autocompleteRef.current.parentElement !== autocompleteContainer) {
-          autocompleteContainer.innerHTML = ''
-          autocompleteContainer.appendChild(autocompleteRef.current)
-        }
         autocompleteRef.current.value = form.getValues('shipping.addressLine1') ?? ''
       }
 
@@ -948,6 +951,16 @@ export default function CheckoutPage() {
   }, [])
 
   useEffect(() => {
+    if (activeStep === 'address') {
+      return
+    }
+
+    autocompleteCleanupRef.current?.()
+    autocompleteCleanupRef.current = null
+    autocompleteRef.current = null
+  }, [activeStep])
+
+  useEffect(() => {
     setPaymentSession(null)
     setPaymentError(null)
   }, [selectedShippingOptionId, appliedDiscountCode, customerValues, checkoutSessionToken])
@@ -976,6 +989,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     let isActive = true
     let timeoutId: ReturnType<typeof setTimeout> | null = null
+    const abortController = new AbortController()
 
     async function loadQuote() {
       setIsLoadingQuote(true)
@@ -988,6 +1002,7 @@ export default function CheckoutPage() {
             'Content-Type': 'application/json',
           },
           body: quoteRequestPayload,
+          signal: abortController.signal,
         })
 
         const payload = (await response.json()) as Record<string, unknown> & {
@@ -996,13 +1011,13 @@ export default function CheckoutPage() {
         }
 
         if (!response.ok) {
-          throw new Error(getPublicRequestError(response.status, CHECKOUT_ERROR_MESSAGE))
+          throw new Error(getPublicRequestError(response.status, QUOTE_ERROR_MESSAGE))
         }
 
         const nextQuote = parseQuoteResponse(payload)
 
         if (!nextQuote?.checkoutSessionToken) {
-          throw new Error(CHECKOUT_ERROR_MESSAGE)
+          throw new Error(QUOTE_ERROR_MESSAGE)
         }
 
         if (!isActive) {
@@ -1033,7 +1048,7 @@ export default function CheckoutPage() {
 
         setQuote(null)
         quotedRequestPayloadRef.current = null
-        setQuoteError(error instanceof Error ? error.message : CHECKOUT_ERROR_MESSAGE)
+        setQuoteError(error instanceof Error ? error.message : QUOTE_ERROR_MESSAGE)
       } finally {
         if (isActive) {
           setIsLoadingQuote(false)
@@ -1052,6 +1067,7 @@ export default function CheckoutPage() {
       })
       return () => {
         isActive = false
+        abortController.abort()
       }
     }
 
@@ -1061,6 +1077,7 @@ export default function CheckoutPage() {
 
     return () => {
       isActive = false
+      abortController.abort()
       if (timeoutId) {
         clearTimeout(timeoutId)
       }
@@ -1070,6 +1087,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     let isActive = true
     let timeoutId: ReturnType<typeof setTimeout> | null = null
+    const abortController = new AbortController()
 
     async function loadPaymentIntent() {
       setIsLoadingPayment(true)
@@ -1082,6 +1100,7 @@ export default function CheckoutPage() {
             'Content-Type': 'application/json',
           },
           body: buildPaymentRequestPayload(),
+          signal: abortController.signal,
         })
 
         const payload = (await response.json()) as Record<string, unknown> & {
@@ -1135,6 +1154,7 @@ export default function CheckoutPage() {
       setIsLoadingPayment(false)
       return () => {
         isActive = false
+        abortController.abort()
       }
     }
 
@@ -1144,6 +1164,7 @@ export default function CheckoutPage() {
 
     return () => {
       isActive = false
+      abortController.abort()
       if (timeoutId) {
         clearTimeout(timeoutId)
       }
@@ -1206,7 +1227,7 @@ export default function CheckoutPage() {
       if (activeStep !== 'customer') {
         setActiveStep('customer')
       }
-    } else if (!addressComplete) {
+    } else if (!addressReadyForShipping) {
       if (getStepIndex(activeStep) > getStepIndex('address')) {
         setActiveStep('address')
       }
@@ -1215,7 +1236,7 @@ export default function CheckoutPage() {
         setActiveStep('shipping')
       }
     }
-  }, [activeStep, addressComplete, customerComplete, shippingComplete])
+  }, [activeStep, addressReadyForShipping, customerComplete, shippingComplete])
 
   if (items.length === 0) {
     return (
@@ -1390,6 +1411,19 @@ export default function CheckoutPage() {
                   rates.
                 </div>
 
+                {addressComplete && isLoadingQuote ? (
+                  <div className="flex items-center gap-2 rounded-2xl border border-brand-300 bg-brand-50 px-4 py-3 text-sm text-gray-600">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Calculating taxes and shipping rates...
+                  </div>
+                ) : null}
+
+                {quoteError ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {quoteError} Please verify the address and ZIP code.
+                  </div>
+                ) : null}
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="shipping-address-line-1">Street address</Label>
@@ -1486,7 +1520,7 @@ export default function CheckoutPage() {
                     <Input
                       id="shipping-state"
                       placeholder="FL"
-                      maxLength={3}
+                      maxLength={2}
                       readOnly={usesGoogleManagedAddress}
                       disabled={usesGoogleManagedAddress}
                       className={usesGoogleManagedAddress ? 'bg-gray-50 text-gray-500' : undefined}

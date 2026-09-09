@@ -59,14 +59,14 @@ export const useCartStore = create<CartState>()(
       addItem: (product: Product, quantity = 1) => {
         set((state) => {
           const safeQuantity =
-            Number.isFinite(quantity) && quantity > 0 ? Math.min(99, Math.floor(quantity)) : 1
+            Number.isFinite(quantity) && quantity > 0 ? Math.min(50, Math.floor(quantity)) : 1
           const cartItemId = getCartItemId(product)
           const existingItem = state.items.find((item) => item.cartItemId === cartItemId)
           if (existingItem) {
             return {
               items: state.items.map((item) =>
                 item.cartItemId === cartItemId
-                  ? { ...item, quantity: Math.min(99, item.quantity + safeQuantity) }
+                  ? { ...item, quantity: Math.min(50, item.quantity + safeQuantity) }
                   : item
               ),
             }
@@ -93,7 +93,7 @@ export const useCartStore = create<CartState>()(
         set((state) => ({
           items: state.items.map((item) =>
             item.cartItemId === cartItemId
-              ? { ...item, quantity: Math.min(99, safeQuantity) }
+              ? { ...item, quantity: Math.min(50, safeQuantity) }
               : item
           ),
         }))
