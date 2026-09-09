@@ -20,6 +20,7 @@ type PersistedCartItem = Pick<
   | 'name'
   | 'price'
   | 'image'
+  | 'active'
   | 'selectedVariantId'
   | 'selectedColor'
   | 'selectedSize'
@@ -57,6 +58,10 @@ export const useCartStore = create<CartState>()(
       items: [],
 
       addItem: (product: Product, quantity = 1) => {
+        if (product.active === false) {
+          return
+        }
+
         set((state) => {
           const safeQuantity =
             Number.isFinite(quantity) && quantity > 0 ? Math.min(50, Math.floor(quantity)) : 1
@@ -124,6 +129,7 @@ export const useCartStore = create<CartState>()(
           name: item.name,
           price: item.price,
           image: item.image,
+          active: item.active,
           selectedVariantId: item.selectedVariantId,
           selectedColor: item.selectedColor,
           selectedSize: item.selectedSize,
