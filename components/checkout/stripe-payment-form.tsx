@@ -10,6 +10,10 @@ import {
 } from '@stripe/react-stripe-js'
 
 import { useCartStore } from '@/lib/store/cart-store'
+import {
+  clearCheckoutNewsletterPreference,
+  saveCheckoutNewsletterPreference,
+} from '@/lib/checkout/newsletter-preference'
 
 const STRIPE_PAYMENT_ERROR_MESSAGE =
   'We could not confirm the payment right now. Please review your details and try again.'
@@ -18,11 +22,15 @@ const STRIPE_PAYMENT_LOAD_ERROR_MESSAGE =
 
 interface StripePaymentFormProps {
   amountLabel: string
+  customerEmail: string
+  newsletterOptIn: boolean
   onLoadError?: (message: string) => void
 }
 
 export function StripePaymentForm({
   amountLabel,
+  customerEmail,
+  newsletterOptIn,
   onLoadError,
 }: StripePaymentFormProps) {
   const stripe = useStripe()
@@ -42,6 +50,12 @@ export function StripePaymentForm({
     setIsSubmitting(true)
     setPaymentError(null)
 
+    if (newsletterOptIn) {
+      saveCheckoutNewsletterPreference(customerEmail)
+    } else {
+      clearCheckoutNewsletterPreference()
+    }
+
     const result = await stripe.confirmPayment({
       elements,
       confirmParams: {
@@ -51,6 +65,7 @@ export function StripePaymentForm({
     })
 
     if (result.error) {
+      clearCheckoutNewsletterPreference()
       setPaymentError(STRIPE_PAYMENT_ERROR_MESSAGE)
       setIsSubmitting(false)
       return
@@ -62,6 +77,7 @@ export function StripePaymentForm({
       return
     }
 
+    clearCheckoutNewsletterPreference()
     setPaymentError('The payment is still pending confirmation. Please try again.')
     setIsSubmitting(false)
   }

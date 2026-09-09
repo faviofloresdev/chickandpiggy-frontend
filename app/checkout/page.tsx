@@ -26,6 +26,7 @@ import { buildCheckoutItemsPayload } from '@/lib/checkout/payload'
 import { checkoutCustomerSchema, checkoutShippingSchema } from '@/lib/checkout/session'
 import { useCartStore } from '@/lib/store/cart-store'
 import { StripeElementsCheckout } from '@/components/checkout/stripe-elements-checkout'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -120,10 +121,12 @@ function parseGoogleAddressComponents(place: any) {
   const state = getComponent('administrative_area_level_1', 'short')
   const postalCode = getComponent('postal_code')
   const country = getComponent('country', 'short') || 'US'
+  const streetAddress = [streetNumber, route].filter(Boolean).join(' ').trim()
+  const unitDetails = [subpremise, floor, room].filter(Boolean).join(', ').trim()
 
   return {
-    addressLine1: [streetNumber, route].filter(Boolean).join(' ').trim(),
-    addressLine2: [subpremise, floor, room].filter(Boolean).join(', ').trim(),
+    addressLine1: [streetAddress, unitDetails].filter(Boolean).join(', '),
+    addressLine2: '',
     city,
     state,
     postalCode,
@@ -415,6 +418,7 @@ export default function CheckoutPage() {
   const [paymentSession, setPaymentSession] = useState<CheckoutPaymentIntentResponse | null>(null)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [isLoadingPayment, setIsLoadingPayment] = useState(false)
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false)
   const addressLine1InputRef = useRef<HTMLInputElement | null>(null)
   const addressAutocompleteContainerRef = useRef<HTMLDivElement | null>(null)
   const autocompleteRef = useRef<any>(null)
@@ -512,7 +516,6 @@ export default function CheckoutPage() {
     googleValidatedAddress: false,
   }
 
-  const addressLine2Value = safeShippingValues.addressLine2?.trim() ?? ''
   const shippingAddressSummaryLines = buildAddressSummaryLines(safeShippingValues)
   const checkoutItemsPayload = useMemo(() => buildCheckoutItemsPayload(items), [items])
   const hasInvalidCartItems = checkoutItemsPayload.length !== items.length
@@ -742,13 +745,13 @@ export default function CheckoutPage() {
       if (!autocompleteRef.current) {
         const placeAutocomplete = new PlaceAutocompleteElement({
           includedRegionCodes: ['us'],
-          placeholder: 'Start typing your shipping address',
+          placeholder: 'Street address, apartment or suite',
           value: form.getValues('shipping.addressLine1') ?? '',
         })
 
         placeAutocomplete.className =
           'block w-full rounded-xl border border-input bg-transparent text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
-        placeAutocomplete.setAttribute('aria-label', 'Street address')
+        placeAutocomplete.setAttribute('aria-label', 'Street address, apartment or suite')
 
         const handleInput = (event: Event) => {
           const target = event.currentTarget as any
@@ -1162,30 +1165,30 @@ export default function CheckoutPage() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 md:px-8 md:py-16">
-      <div className="mb-8 text-center">
-        <h1 className="mb-4 text-4xl font-semibold tracking-tight text-brand-500">
+    <section className="mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-10 md:px-8 md:py-16">
+      <div className="mb-6 text-center sm:mb-8">
+        <h1 className="mb-3 text-3xl font-semibold tracking-tight text-brand-500 sm:mb-4 sm:text-4xl">
           Complete Your Purchase
         </h1>
-        <p className="text-lg font-serif text-gray-500">
+        <p className="text-base font-serif text-gray-500 sm:text-lg">
           Enter your details, choose delivery, and pay securely on one page.
         </p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_380px] lg:items-start">
-        <div className="order-2 lg:order-1">
-          <div className="rounded-[2rem] border border-brand-200 bg-white p-5 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:p-6 md:p-8">
-            <div className="space-y-10">
+      <div className="grid gap-5 sm:gap-8 lg:grid-cols-[minmax(0,1.1fr)_380px] lg:items-start">
+        <div className="order-1">
+          <div className="rounded-3xl border border-brand-200 bg-white p-4 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:rounded-[2rem] sm:p-6 md:p-8">
+            <div className="space-y-8 sm:space-y-10">
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-semibold tracking-tight text-brand-700">
+                  <h3 className="text-xl font-semibold tracking-tight text-brand-700 sm:text-2xl">
                     Customer details
                   </h3>
-                  <Truck className="h-7 w-7 text-brand-500" />
+                  <Truck className="h-6 w-6 text-brand-500 sm:h-7 sm:w-7" />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="customer-name">Customer name</Label>
                     <Input
                       id="customer-name"
@@ -1230,18 +1233,44 @@ export default function CheckoutPage() {
                       </p>
                     ) : null}
                   </div>
+
+                  <div className="rounded-2xl border border-brand-200 bg-brand-50 p-3 sm:col-span-2 sm:p-4">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="checkout-newsletter-opt-in"
+                        checked={newsletterOptIn}
+                        onCheckedChange={(checked) => setNewsletterOptIn(checked === true)}
+                        aria-describedby="checkout-newsletter-description"
+                        className="mt-0.5 border-brand-400 data-[state=checked]:border-brand-500 data-[state=checked]:bg-brand-500"
+                      />
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="checkout-newsletter-opt-in"
+                          className="cursor-pointer font-medium text-brand-800"
+                        >
+                          Email me news and special updates
+                        </Label>
+                        <p
+                          id="checkout-newsletter-description"
+                          className="text-sm leading-5 text-gray-500"
+                        >
+                          We will use the email above. You can unsubscribe at any time.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-5 border-t border-brand-100 pt-10">
+              <div className="space-y-5 border-t border-brand-100 pt-8 sm:pt-10">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-semibold tracking-tight text-brand-700">
+                  <h3 className="text-xl font-semibold tracking-tight text-brand-700 sm:text-2xl">
                     Shipping address
                   </h3>
-                  <MapPin className="h-7 w-7 text-brand-500" />
+                  <MapPin className="h-6 w-6 text-brand-500 sm:h-7 sm:w-7" />
                 </div>
 
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600 sm:p-4">
                   Orders ship
                   {originLabel ? (
                     <>
@@ -1252,9 +1281,11 @@ export default function CheckoutPage() {
                   rates.
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="shipping-address-line-1">Street address</Label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="shipping-address-line-1">
+                      Street address, apartment or suite
+                    </Label>
                     {shouldRenderGoogleAddressInput ? (
                       <div
                         id="shipping-address-line-1"
@@ -1264,7 +1295,7 @@ export default function CheckoutPage() {
                     ) : (
                       <Input
                         id="shipping-address-line-1"
-                        placeholder="Start typing your shipping address"
+                        placeholder="Street address, apartment or suite"
                         {...addressLine1Field}
                         ref={(element) => {
                           addressLine1Field.ref(element)
@@ -1303,28 +1334,14 @@ export default function CheckoutPage() {
                     ) : null}
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="shipping-address-line-2">Apt, suite, etc. (optional)</Label>
-                    <Input
-                      id="shipping-address-line-2"
-                      placeholder="Apartment, suite, unit, building, floor, etc."
-                      {...form.register('shipping.addressLine2')}
-                    />
-                    {googleStatus === 'ready' && addressValidated ? (
-                      <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
-                        <p className="font-medium">Selected address</p>
-                        {shippingAddressSummaryLines.map((line) => (
-                          <p key={line}>{line}</p>
-                        ))}
-                        {!addressLine2Value ? (
-                          <p className="mt-2 text-brand-700">
-                            If your Google suggestion included an apartment, suite, or unit,
-                            confirm it here before continuing.
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
+                  {googleStatus === 'ready' && addressValidated ? (
+                    <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800 sm:col-span-2">
+                      <p className="font-medium">Selected address</p>
+                      {shippingAddressSummaryLines.map((line) => (
+                        <p key={line}>{line}</p>
+                      ))}
+                    </div>
+                  ) : null}
 
                   <div className="space-y-2">
                     <Label htmlFor="shipping-city">City</Label>
@@ -1423,12 +1440,12 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <div className="space-y-5 border-t border-brand-100 pt-10">
+              <div className="space-y-5 border-t border-brand-100 pt-8 sm:pt-10">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-semibold tracking-tight text-brand-700">
+                  <h3 className="text-xl font-semibold tracking-tight text-brand-700 sm:text-2xl">
                     Shipping method
                   </h3>
-                  <Truck className="h-7 w-7 text-brand-500" />
+                  <Truck className="h-6 w-6 text-brand-500 sm:h-7 sm:w-7" />
                 </div>
 
                 <div className="space-y-4">
@@ -1472,7 +1489,7 @@ export default function CheckoutPage() {
                         <Label
                           key={option.id}
                           htmlFor={`shipping-option-${option.id}`}
-                          className={`flex cursor-pointer items-start gap-4 rounded-2xl border p-4 transition-colors ${
+                          className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3 transition-colors sm:gap-4 sm:p-4 ${
                             selectedShippingOptionId === option.id
                               ? 'border-brand-500 bg-brand-150'
                               : 'border-gray-200 bg-white hover:border-[#D6C7EF]'
@@ -1484,12 +1501,12 @@ export default function CheckoutPage() {
                             className="mt-1 border-brand-500 text-brand-500"
                           />
                           <div className="flex-1 space-y-1">
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="font-medium text-gray-800">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                              <span className="min-w-0 break-words font-medium text-gray-800">
                                 {option.label ??
                                   [option.carrier, option.service].filter(Boolean).join(' ')}
                               </span>
-                              <span className="text-sm font-semibold text-brand-700">
+                              <span className="shrink-0 text-sm font-semibold text-brand-700">
                                 ${option.amount.toFixed(2)}
                               </span>
                             </div>
@@ -1521,10 +1538,88 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <div className="space-y-6 border-t border-brand-100 pt-10">
+              <div className="space-y-5 border-t border-brand-100 pt-8 sm:pt-10">
+                <div className="flex items-center gap-2 text-lg font-semibold tracking-tight text-brand-700 sm:text-xl">
+                  <Percent className="h-5 w-5" />
+                  Discount code
+                </div>
+
+                <div className="rounded-2xl border border-brand-300 bg-brand-50 p-3 sm:p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Input
+                      value={discountCode}
+                      onChange={(event) => {
+                        const nextValue = event.target.value
+                        setDiscountCode(nextValue)
+                        setDiscountError(null)
+                        setDiscountSuccessMessage(null)
+
+                        if (appliedDiscountCode && appliedDiscountCode !== nextValue.trim()) {
+                          setAppliedDiscountCode(null)
+                        }
+
+                        if (appliedDiscount && appliedDiscount.code !== nextValue.trim()) {
+                          setAppliedDiscount(null)
+                        }
+                      }}
+                      placeholder="Enter your code"
+                      disabled={!canApplyDiscount && !appliedDiscount}
+                      className="bg-white disabled:cursor-not-allowed disabled:bg-gray-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleApplyDiscount()}
+                      disabled={isApplyingDiscount || !canApplyDiscount}
+                      className="shrink-0 rounded-full bg-brand-400 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-450 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isApplyingDiscount ? 'Validating...' : 'Apply discount'}
+                    </button>
+                  </div>
+
+                  {!canApplyDiscount && !appliedDiscount ? (
+                    <p className="mt-3 text-sm text-gray-500">
+                      {cartIntegrityError ??
+                        'Complete the shipping address first to apply a discount code.'}
+                    </p>
+                  ) : null}
+
+                  {appliedDiscount ? (
+                    <div className="mt-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                      <p className="font-medium">
+                        {appliedDiscount.code} applied
+                        {appliedDiscount.amount > 0
+                          ? ` (-$${appliedDiscount.amount.toFixed(2)})`
+                          : ''}
+                      </p>
+                      {appliedDiscount.description ? (
+                        <p className="mt-1">{appliedDiscount.description}</p>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={handleRemoveDiscount}
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-green-800 transition-colors hover:text-green-900"
+                      >
+                        <X className="h-4 w-4" />
+                        Remove
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {discountError ? (
+                    <p className="mt-3 text-sm text-red-600">{discountError}</p>
+                  ) : null}
+                  {!discountError && discountSuccessMessage ? (
+                    <p className="mt-3 text-sm text-green-700">{discountSuccessMessage}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-6 border-t border-brand-100 pt-8 sm:pt-10">
                 <StripeElementsCheckout
                   paymentSession={paymentSession}
                   amountLabel={paymentAmountLabel}
+                  customerEmail={customerValues?.email ?? ''}
+                  newsletterOptIn={newsletterOptIn}
                   isLoading={isLoadingPayment}
                   checkoutError={paymentError}
                   canInitialize={canInitializePayment}
@@ -1534,13 +1629,13 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="order-1 lg:order-2">
-          <div className="lg:sticky lg:top-8 rounded-[2rem] border border-brand-200 bg-white p-5 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:p-6">
-            <h3 className="mb-5 text-xl font-semibold tracking-tight text-brand-700">
+        <div className="order-2">
+          <div className="rounded-3xl border border-brand-200 bg-white p-4 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:rounded-[2rem] sm:p-6 lg:sticky lg:top-8">
+            <h3 className="mb-4 text-xl font-semibold tracking-tight text-brand-700 sm:mb-5">
               Order Summary
             </h3>
 
-            <div className="mb-6 space-y-4 border-b border-gray-100 pb-6">
+            <div className="mb-5 space-y-3 border-b border-gray-100 pb-5 sm:mb-6 sm:space-y-4 sm:pb-6">
               {cartIntegrityError ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   {cartIntegrityError}
@@ -1551,7 +1646,7 @@ export default function CheckoutPage() {
 
                 return (
                   <div key={item.cartItemId} className="flex items-center gap-3">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-brand-100">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-100 sm:h-14 sm:w-14 sm:rounded-2xl">
                       <img
                         src={item.image}
                         alt={item.name}
@@ -1573,81 +1668,7 @@ export default function CheckoutPage() {
               })}
             </div>
 
-            <div className="mb-6 space-y-3 text-sm text-gray-600">
-              <div className="space-y-5 rounded-[1.75rem] border border-brand-300 bg-brand-50 p-5">
-                <div className="flex items-center gap-2 text-sm font-medium text-brand-700">
-                  <Percent className="h-4 w-4" />
-                  Discount code
-                </div>
-
-                <div className="space-y-3">
-                  <Input
-                    value={discountCode}
-                    onChange={(event) => {
-                      const nextValue = event.target.value
-                      setDiscountCode(nextValue)
-                      setDiscountError(null)
-                      setDiscountSuccessMessage(null)
-
-                      if (appliedDiscountCode && appliedDiscountCode !== nextValue.trim()) {
-                        setAppliedDiscountCode(null)
-                      }
-
-                      if (appliedDiscount && appliedDiscount.code !== nextValue.trim()) {
-                        setAppliedDiscount(null)
-                      }
-                    }}
-                    placeholder="Enter your code"
-                    disabled={!canApplyDiscount && !appliedDiscount}
-                    className="bg-white disabled:cursor-not-allowed disabled:bg-gray-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleApplyDiscount()}
-                    disabled={isApplyingDiscount || !canApplyDiscount}
-                    className="w-full rounded-full bg-brand-400 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-450 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isApplyingDiscount ? 'Validating...' : 'Apply discount'}
-                  </button>
-                </div>
-
-                {!canApplyDiscount && !appliedDiscount ? (
-                  <p className="text-sm text-gray-500">
-                    {cartIntegrityError ??
-                      'Complete the shipping address first so we can refresh checkout before applying a discount code.'}
-                  </p>
-                ) : null}
-
-                {appliedDiscount ? (
-                  <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                    <p className="font-medium">
-                      {appliedDiscount.code} applied
-                      {appliedDiscount.amount > 0
-                        ? ` (-$${appliedDiscount.amount.toFixed(2)})`
-                        : ''}
-                    </p>
-                    {appliedDiscount.description ? (
-                      <p className="mt-1">{appliedDiscount.description}</p>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={handleRemoveDiscount}
-                      className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-green-800 transition-colors hover:text-green-900"
-                    >
-                      <X className="h-4 w-4" />
-                      Remove
-                    </button>
-                  </div>
-                ) : null}
-
-                {discountError ? (
-                  <p className="text-sm text-red-600">{discountError}</p>
-                ) : null}
-                {!discountError && discountSuccessMessage ? (
-                  <p className="text-sm text-green-700">{discountSuccessMessage}</p>
-                ) : null}
-              </div>
-
+            <div className="mb-5 space-y-3 text-sm text-gray-600 sm:mb-6">
               <div className="flex justify-between">
                 <p>Subtotal</p>
                 <p className="font-medium text-gray-800">
@@ -1678,9 +1699,9 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <div className="space-y-4 border-t border-gray-100 pt-6">
+            <div className="space-y-4 border-t border-gray-100 pt-5 sm:pt-6">
               {shippingAddressSummaryLines.length > 0 ? (
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700 sm:p-4">
                   <p className="mb-2 font-medium text-gray-800">Ship to</p>
                   {shippingAddressSummaryLines.map((line) => (
                     <p key={line}>{line}</p>
@@ -1693,7 +1714,7 @@ export default function CheckoutPage() {
                   {displayTotals ? `$${total.toFixed(2)}` : `$${getSubtotal().toFixed(2)}`}
                 </p>
               </div>
-              <div className="rounded-2xl border border-dashed border-brand-350 bg-brand-75 p-4 text-sm text-gray-700">
+              <div className="rounded-2xl border border-dashed border-brand-350 bg-brand-75 p-3 text-sm text-gray-700 sm:p-4">
                 <p className="font-medium text-brand-800">
                   {selectedShippingOption
                     ? selectedShippingOption.label ??

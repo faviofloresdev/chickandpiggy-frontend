@@ -18,6 +18,8 @@ const invalidStripePublishableKeyPatterns = [
 interface StripeElementsCheckoutProps {
   paymentSession: CheckoutPaymentIntentResponse | null
   amountLabel: string
+  customerEmail: string
+  newsletterOptIn: boolean
   isLoading: boolean
   checkoutError: string | null
   canInitialize: boolean
@@ -26,6 +28,8 @@ interface StripeElementsCheckoutProps {
 export function StripeElementsCheckout({
   paymentSession,
   amountLabel,
+  customerEmail,
+  newsletterOptIn,
   isLoading,
   checkoutError,
   canInitialize,
@@ -59,18 +63,18 @@ export function StripeElementsCheckout({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-semibold tracking-tight text-brand-700">
+        <h3 className="text-xl font-semibold tracking-tight text-brand-700 sm:text-2xl">
           Secure Payment
         </h3>
-        <CreditCard className="h-7 w-7 text-brand-500" />
+        <CreditCard className="h-6 w-6 text-brand-500 sm:h-7 sm:w-7" />
       </div>
 
       <div className="space-y-4">
-        <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed text-gray-600">
+        <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3 text-sm leading-relaxed text-gray-600 sm:p-4">
           Complete your payment without leaving our website. Stripe Elements securely renders the payment fields inside this checkout.
         </div>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+        <div className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3 sm:items-center sm:p-4">
           <ShieldCheck className="h-6 w-6 shrink-0 text-success-500" />
           <span className="text-sm text-gray-600">
             Payments are securely processed by <strong>Stripe</strong>. We do not store your card details.
@@ -84,13 +88,13 @@ export function StripeElementsCheckout({
         ) : null}
 
         {!canInitialize ? (
-          <div className="rounded-[1.5rem] border border-dashed border-brand-350 bg-brand-50 px-4 py-10 text-center text-sm text-gray-500">
+          <div className="rounded-[1.5rem] border border-dashed border-brand-350 bg-brand-50 px-4 py-8 text-center text-sm text-gray-500 sm:py-10">
             Complete your contact and delivery information above to load the Stripe payment form.
           </div>
         ) : null}
 
         {isLoading ? (
-          <div className="rounded-[1.5rem] border border-brand-300 bg-brand-50 px-4 py-10 text-center text-sm text-gray-500">
+          <div className="rounded-[1.5rem] border border-brand-300 bg-brand-50 px-4 py-8 text-center text-sm text-gray-500 sm:py-10">
             Loading secure payment form...
           </div>
         ) : null}
@@ -137,6 +141,8 @@ export function StripeElementsCheckout({
           >
             <StripePaymentForm
               amountLabel={amountLabel}
+              customerEmail={customerEmail}
+              newsletterOptIn={newsletterOptIn}
               onLoadError={(message) => setPaymentElementError(message)}
             />
           </Elements>
