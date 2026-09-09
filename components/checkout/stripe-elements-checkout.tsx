@@ -85,7 +85,7 @@ export function StripeElementsCheckout({
 
         {!canInitialize ? (
           <div className="rounded-[1.5rem] border border-dashed border-brand-350 bg-brand-50 px-4 py-10 text-center text-sm text-gray-500">
-            Complete customer details, validate the address, and choose a shipping option to load the Stripe payment form.
+            Complete your contact and delivery information above to load the Stripe payment form.
           </div>
         ) : null}
 

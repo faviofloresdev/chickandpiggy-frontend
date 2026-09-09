@@ -29,7 +29,6 @@ import { StripeElementsCheckout } from '@/components/checkout/stripe-elements-ch
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { cn } from '@/lib/utils'
 
 declare global {
   interface Window {
@@ -43,7 +42,6 @@ const checkoutFormSchema = z.object({
 })
 
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>
-type CheckoutStepId = 'customer' | 'address' | 'shipping' | 'payment'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const INVALID_CART_MESSAGE =
@@ -240,10 +238,6 @@ function normalizeDiscountPercentage(value: number | undefined) {
   return value <= 1 ? value * 100 : value
 }
 
-function getStepIndex(step: CheckoutStepId) {
-  return ['customer', 'address', 'shipping', 'payment'].indexOf(step)
-}
-
 function parseTotals(source: Record<string, unknown> | undefined) {
   if (!source) {
     return null
@@ -421,7 +415,6 @@ export default function CheckoutPage() {
   const [paymentSession, setPaymentSession] = useState<CheckoutPaymentIntentResponse | null>(null)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [isLoadingPayment, setIsLoadingPayment] = useState(false)
-  const [activeStep, setActiveStep] = useState<CheckoutStepId>('customer')
   const addressLine1InputRef = useRef<HTMLInputElement | null>(null)
   const addressAutocompleteContainerRef = useRef<HTMLDivElement | null>(null)
   const autocompleteRef = useRef<any>(null)
@@ -429,11 +422,6 @@ export default function CheckoutPage() {
   const persistedOrderIdRef = useRef<number | null>(null)
   const persistedPaymentIntentIdRef = useRef<string | null>(null)
   const quotedRequestPayloadRef = useRef<string | null>(null)
-  const previousStepCompletionRef = useRef({
-    customer: false,
-    address: false,
-    shipping: false,
-  })
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
@@ -622,73 +610,6 @@ export default function CheckoutPage() {
     : subtotal
   const originLabel = quote?.originLabel?.trim() || ''
   const paymentAmountLabel = displayTotals ? `$${total.toFixed(2)}` : '$0.00'
-  const customerComplete =
-    !!customerValues?.name?.trim() &&
-    !!customerValues?.email?.trim() &&
-    !!customerValues?.phone?.trim() &&
-    !form.formState.errors.customer?.name &&
-    !form.formState.errors.customer?.email &&
-    !form.formState.errors.customer?.phone
-  const addressComplete =
-    canRequestQuote &&
-    !form.formState.errors.shipping?.addressLine1 &&
-    !form.formState.errors.shipping?.city &&
-    !form.formState.errors.shipping?.state &&
-    !form.formState.errors.shipping?.postalCode
-  const addressReadyForShipping =
-    addressComplete &&
-    quoteMatchesCurrentAddress &&
-    !isLoadingQuote &&
-    !quoteError
-  const shippingComplete =
-    shippingSelectionSatisfied && (requiresShippingSelection || hasShippingException)
-  const paymentReady = canInitializePayment && !!paymentSession?.clientSecret && !isLoadingPayment
-  const steps = [
-    {
-      id: 'customer' as const,
-      label: 'Customer',
-      helper: customerComplete
-        ? customerValues?.name?.trim() || 'Ready'
-        : 'Contact details',
-      complete: customerComplete,
-      available: true,
-    },
-    {
-      id: 'address' as const,
-      label: 'Address',
-      helper: addressReadyForShipping
-        ? `${safeShippingValues.city}, ${safeShippingValues.state}`
-        : addressComplete && isLoadingQuote
-          ? 'Loading rates'
-          : quoteError
-            ? 'Check address'
-            : 'Shipping address',
-      complete: addressReadyForShipping,
-      available: customerComplete,
-    },
-    {
-      id: 'shipping' as const,
-      label: 'Shipping',
-      helper: shippingComplete
-        ? hasShippingException
-          ? 'Free shipping'
-          : selectedShippingOption?.label ??
-            [selectedShippingOption?.carrier, selectedShippingOption?.service]
-              .filter(Boolean)
-              .join(' ')
-        : 'Choose a rate',
-      complete: shippingComplete,
-      available: customerComplete && addressReadyForShipping,
-    },
-    {
-      id: 'payment' as const,
-      label: 'Payment',
-      helper: paymentReady ? 'Stripe ready' : 'Secure checkout',
-      complete: false,
-      available: customerComplete && addressComplete && shippingComplete,
-    },
-  ]
-
   useEffect(() => {
     if (autocompleteRef.current) {
       autocompleteRef.current.value = safeShippingValues.addressLine1 ?? ''
@@ -786,10 +707,6 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY) {
       setGoogleStatus('unavailable')
-      return
-    }
-
-    if (activeStep !== 'address') {
       return
     }
 
@@ -979,7 +896,7 @@ export default function CheckoutPage() {
       script.onload = null
       script.onerror = null
     }
-  }, [activeStep, form])
+  }, [form])
 
   useEffect(() => {
     return () => {
@@ -988,16 +905,6 @@ export default function CheckoutPage() {
       autocompleteRef.current = null
     }
   }, [])
-
-  useEffect(() => {
-    if (activeStep === 'address') {
-      return
-    }
-
-    autocompleteCleanupRef.current?.()
-    autocompleteCleanupRef.current = null
-    autocompleteRef.current = null
-  }, [activeStep])
 
   useEffect(() => {
     setPaymentSession(null)
@@ -1229,64 +1136,6 @@ export default function CheckoutPage() {
     })
   }, [form, freeShippingOption, hasShippingException, selectedShippingOptionId])
 
-  useEffect(() => {
-    const previousCompletion = previousStepCompletionRef.current
-
-    previousStepCompletionRef.current = {
-      customer: customerComplete,
-      address: addressReadyForShipping,
-      shipping: shippingComplete,
-    }
-
-    if (
-      activeStep === 'customer' &&
-      customerComplete &&
-      !previousCompletion.customer
-    ) {
-      setActiveStep('address')
-      return
-    }
-
-    if (
-      activeStep === 'address' &&
-      addressReadyForShipping &&
-      !previousCompletion.address
-    ) {
-      setActiveStep(hasShippingException && shippingComplete ? 'payment' : 'shipping')
-      return
-    }
-
-    if (
-      activeStep === 'shipping' &&
-      shippingComplete &&
-      !previousCompletion.shipping
-    ) {
-      setActiveStep('payment')
-    }
-  }, [
-    activeStep,
-    addressReadyForShipping,
-    customerComplete,
-    hasShippingException,
-    shippingComplete,
-  ])
-
-  useEffect(() => {
-    if (!customerComplete) {
-      if (activeStep !== 'customer') {
-        setActiveStep('customer')
-      }
-    } else if (!addressReadyForShipping) {
-      if (getStepIndex(activeStep) > getStepIndex('address')) {
-        setActiveStep('address')
-      }
-    } else if (!shippingComplete) {
-      if (getStepIndex(activeStep) > getStepIndex('shipping')) {
-        setActiveStep('shipping')
-      }
-    }
-  }, [activeStep, addressReadyForShipping, customerComplete, shippingComplete])
-
   if (items.length === 0) {
     return (
       <section className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-24">
@@ -1319,69 +1168,14 @@ export default function CheckoutPage() {
           Complete Your Purchase
         </h1>
         <p className="text-lg font-serif text-gray-500">
-          A shorter checkout flow that moves step by step until payment is ready.
+          Enter your details, choose delivery, and pay securely on one page.
         </p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_380px] lg:items-start">
         <div className="order-2 lg:order-1">
           <div className="rounded-[2rem] border border-brand-200 bg-white p-5 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:p-6 md:p-8">
-            <div className="mb-6 flex flex-wrap gap-3">
-              {steps.map((step, index) => {
-                const isActive = activeStep === step.id
-
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    onClick={() => {
-                      if (step.available || step.complete) {
-                        setActiveStep(step.id)
-                      }
-                    }}
-                    disabled={!step.available && !step.complete}
-                    className={cn(
-                      'flex min-w-[140px] flex-1 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all',
-                      isActive
-                        ? 'border-brand-500 bg-brand-100 shadow-[0_10px_30px_rgba(165,142,212,0.16)]'
-                        : step.complete
-                          ? 'border-[#D7F0DE] bg-[#F3FBF6]'
-                          : 'border-brand-300 bg-brand-50',
-                      !step.available && !step.complete && 'cursor-not-allowed opacity-55'
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold',
-                        step.complete
-                          ? 'bg-success-500 text-white'
-                          : isActive
-                            ? 'bg-brand-500 text-white'
-                            : 'bg-white text-brand-700'
-                      )}
-                    >
-                      {step.complete ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-brand-800">{step.label}</p>
-                      <p className="truncate text-xs text-gray-500">{step.helper}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="mb-6 rounded-2xl border border-brand-300 bg-brand-50 px-4 py-3 text-sm text-gray-600">
-              {activeStep === 'customer'
-                ? 'Step 1 of 4. We start with the contact details.'
-                : activeStep === 'address'
-                  ? 'Step 2 of 4. Once rates are ready, free shipping goes directly to payment.'
-                  : activeStep === 'shipping'
-                    ? 'Step 3 of 4. Pick the best rate to unlock payment.'
-                    : 'Step 4 of 4. Payment is ready with Stripe.'}
-            </div>
-
-            {activeStep === 'customer' ? (
+            <div className="space-y-10">
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-2xl font-semibold tracking-tight text-brand-700">
@@ -1438,10 +1232,8 @@ export default function CheckoutPage() {
                   </div>
                 </div>
               </div>
-            ) : null}
 
-            {activeStep === 'address' ? (
-              <div className="space-y-5">
+              <div className="space-y-5 border-t border-brand-100 pt-10">
                 <div className="flex items-center justify-between">
                   <h3 className="text-2xl font-semibold tracking-tight text-brand-700">
                     Shipping address
@@ -1459,22 +1251,6 @@ export default function CheckoutPage() {
                   . Once the address is complete, we automatically request taxes and live
                   rates.
                 </div>
-
-                {addressComplete && isLoadingQuote ? (
-                  <div className="flex items-center gap-2 rounded-2xl border border-brand-300 bg-brand-50 px-4 py-3 text-sm text-gray-600">
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    Calculating taxes and shipping rates...
-                  </div>
-                ) : null}
-
-                {quoteError ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {quoteError}
-                    {quoteError === INVALID_CART_MESSAGE
-                      ? null
-                      : ' Please verify the address and ZIP code.'}
-                  </div>
-                ) : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
@@ -1646,10 +1422,8 @@ export default function CheckoutPage() {
                   </div>
                 </div>
               </div>
-            ) : null}
 
-            {activeStep === 'shipping' ? (
-              <div className="space-y-5">
+              <div className="space-y-5 border-t border-brand-100 pt-10">
                 <div className="flex items-center justify-between">
                   <h3 className="text-2xl font-semibold tracking-tight text-brand-700">
                     Shipping method
@@ -1677,6 +1451,9 @@ export default function CheckoutPage() {
                   {quoteError ? (
                     <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                       {quoteError}
+                      {quoteError === INVALID_CART_MESSAGE
+                        ? null
+                        : ' Please verify the address and ZIP code.'}
                     </div>
                   ) : null}
 
@@ -1743,10 +1520,8 @@ export default function CheckoutPage() {
                   ) : null}
                 </div>
               </div>
-            ) : null}
 
-            {activeStep === 'payment' ? (
-              <div className="space-y-6">
+              <div className="space-y-6 border-t border-brand-100 pt-10">
                 <StripeElementsCheckout
                   paymentSession={paymentSession}
                   amountLabel={paymentAmountLabel}
@@ -1755,7 +1530,7 @@ export default function CheckoutPage() {
                   canInitialize={canInitializePayment}
                 />
               </div>
-            ) : null}
+            </div>
           </div>
         </div>
 
@@ -1799,81 +1574,79 @@ export default function CheckoutPage() {
             </div>
 
             <div className="mb-6 space-y-3 text-sm text-gray-600">
-              {activeStep === 'payment' ? (
-                <div className="space-y-5 rounded-[1.75rem] border border-brand-300 bg-brand-50 p-5">
-                  <div className="flex items-center gap-2 text-sm font-medium text-brand-700">
-                    <Percent className="h-4 w-4" />
-                    Discount code
-                  </div>
+              <div className="space-y-5 rounded-[1.75rem] border border-brand-300 bg-brand-50 p-5">
+                <div className="flex items-center gap-2 text-sm font-medium text-brand-700">
+                  <Percent className="h-4 w-4" />
+                  Discount code
+                </div>
 
-                  <div className="space-y-3">
-                    <Input
-                      value={discountCode}
-                      onChange={(event) => {
-                        const nextValue = event.target.value
-                        setDiscountCode(nextValue)
-                        setDiscountError(null)
-                        setDiscountSuccessMessage(null)
+                <div className="space-y-3">
+                  <Input
+                    value={discountCode}
+                    onChange={(event) => {
+                      const nextValue = event.target.value
+                      setDiscountCode(nextValue)
+                      setDiscountError(null)
+                      setDiscountSuccessMessage(null)
 
-                        if (appliedDiscountCode && appliedDiscountCode !== nextValue.trim()) {
-                          setAppliedDiscountCode(null)
-                        }
+                      if (appliedDiscountCode && appliedDiscountCode !== nextValue.trim()) {
+                        setAppliedDiscountCode(null)
+                      }
 
-                        if (appliedDiscount && appliedDiscount.code !== nextValue.trim()) {
-                          setAppliedDiscount(null)
-                        }
-                      }}
-                      placeholder="Enter your code"
-                      disabled={!canApplyDiscount && !appliedDiscount}
-                      className="bg-white disabled:cursor-not-allowed disabled:bg-gray-100"
-                    />
+                      if (appliedDiscount && appliedDiscount.code !== nextValue.trim()) {
+                        setAppliedDiscount(null)
+                      }
+                    }}
+                    placeholder="Enter your code"
+                    disabled={!canApplyDiscount && !appliedDiscount}
+                    className="bg-white disabled:cursor-not-allowed disabled:bg-gray-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleApplyDiscount()}
+                    disabled={isApplyingDiscount || !canApplyDiscount}
+                    className="w-full rounded-full bg-brand-400 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-450 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isApplyingDiscount ? 'Validating...' : 'Apply discount'}
+                  </button>
+                </div>
+
+                {!canApplyDiscount && !appliedDiscount ? (
+                  <p className="text-sm text-gray-500">
+                    {cartIntegrityError ??
+                      'Complete the shipping address first so we can refresh checkout before applying a discount code.'}
+                  </p>
+                ) : null}
+
+                {appliedDiscount ? (
+                  <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    <p className="font-medium">
+                      {appliedDiscount.code} applied
+                      {appliedDiscount.amount > 0
+                        ? ` (-$${appliedDiscount.amount.toFixed(2)})`
+                        : ''}
+                    </p>
+                    {appliedDiscount.description ? (
+                      <p className="mt-1">{appliedDiscount.description}</p>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={() => void handleApplyDiscount()}
-                      disabled={isApplyingDiscount || !canApplyDiscount}
-                      className="w-full rounded-full bg-brand-400 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-450 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={handleRemoveDiscount}
+                      className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-green-800 transition-colors hover:text-green-900"
                     >
-                      {isApplyingDiscount ? 'Validating...' : 'Apply discount'}
+                      <X className="h-4 w-4" />
+                      Remove
                     </button>
                   </div>
+                ) : null}
 
-                  {!canApplyDiscount && !appliedDiscount ? (
-                    <p className="text-sm text-gray-500">
-                      {cartIntegrityError ??
-                        'Complete the shipping address first so we can refresh checkout before applying a discount code.'}
-                    </p>
-                  ) : null}
-
-                  {appliedDiscount ? (
-                    <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                      <p className="font-medium">
-                        {appliedDiscount.code} applied
-                        {appliedDiscount.amount > 0
-                          ? ` (-$${appliedDiscount.amount.toFixed(2)})`
-                          : ''}
-                      </p>
-                      {appliedDiscount.description ? (
-                        <p className="mt-1">{appliedDiscount.description}</p>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={handleRemoveDiscount}
-                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-green-800 transition-colors hover:text-green-900"
-                      >
-                        <X className="h-4 w-4" />
-                        Remove
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {discountError ? (
-                    <p className="text-sm text-red-600">{discountError}</p>
-                  ) : null}
-                  {!discountError && discountSuccessMessage ? (
-                    <p className="text-sm text-green-700">{discountSuccessMessage}</p>
-                  ) : null}
-                </div>
-              ) : null}
+                {discountError ? (
+                  <p className="text-sm text-red-600">{discountError}</p>
+                ) : null}
+                {!discountError && discountSuccessMessage ? (
+                  <p className="text-sm text-green-700">{discountSuccessMessage}</p>
+                ) : null}
+              </div>
 
               <div className="flex justify-between">
                 <p>Subtotal</p>
