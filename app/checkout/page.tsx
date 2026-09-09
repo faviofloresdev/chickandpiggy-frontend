@@ -1011,7 +1011,11 @@ export default function CheckoutPage() {
         }
 
         if (!response.ok) {
-          throw new Error(getPublicRequestError(response.status, QUOTE_ERROR_MESSAGE))
+          throw new Error(
+            [400, 404, 422].includes(response.status)
+              ? INVALID_CART_MESSAGE
+              : getPublicRequestError(response.status, QUOTE_ERROR_MESSAGE)
+          )
         }
 
         const nextQuote = parseQuoteResponse(payload)
@@ -1420,7 +1424,10 @@ export default function CheckoutPage() {
 
                 {quoteError ? (
                   <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {quoteError} Please verify the address and ZIP code.
+                    {quoteError}
+                    {quoteError === INVALID_CART_MESSAGE
+                      ? null
+                      : ' Please verify the address and ZIP code.'}
                   </div>
                 ) : null}
 

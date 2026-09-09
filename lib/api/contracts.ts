@@ -43,6 +43,7 @@ export interface Product {
   name: string
   price: number
   image: string
+  active?: boolean
   exclusive?: boolean
   description?: string
   metaTitle?: string

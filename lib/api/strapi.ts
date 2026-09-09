@@ -824,6 +824,7 @@ function normalizeProduct(entry: Record<string, unknown>): Product {
     name: String(getAttribute(entry, 'name') ?? getAttribute(entry, 'title') ?? 'Untitled product'),
     price: Number(getAttribute(entry, 'price') ?? getAttribute(entry, 'basePrice') ?? 0),
     image: resolveMediaUrl(entry),
+      active: getAttribute(entry, 'active') !== false,
       exclusive: Boolean(getAttribute(entry, 'exclusive') ?? false),
       description:
         extractRichText(getAttribute(entry, 'description')) ??
@@ -1392,7 +1393,7 @@ export const strapiCatalogApi = {
       const productEntries = asArray<Record<string, unknown>>(payload)
       const products = productEntries
         .map((entry) => normalizeProduct(entry))
-        .filter((product) => product.image)
+        .filter((product) => product.active !== false && product.image)
 
       return {
         data: limit ? products.slice(0, limit) : products,
@@ -1435,7 +1436,7 @@ export const strapiCatalogApi = {
       const productEntries = asArray<Record<string, unknown>>(payload)
       const products = productEntries
         .map((entry) => normalizeProduct(entry))
-        .filter((product) => product.image)
+        .filter((product) => product.active !== false && product.image)
       const exclusiveProducts = products.filter((product) => product.exclusive)
       const featuredProducts = exclusiveProducts.length > 0 ? exclusiveProducts : products
 

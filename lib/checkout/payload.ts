@@ -49,6 +49,10 @@ function countSelectedOptions(selectedOptions: CartItem['selectedOptions']) {
 export function buildCheckoutItemsPayload(items: CartItem[]): CheckoutItemPayload[] {
   return items
     .flatMap((item) => {
+      if (item.active === false) {
+        return []
+      }
+
       const productReference = item.documentId?.trim() || item.strapiId?.trim()
 
       if (!productReference) {
