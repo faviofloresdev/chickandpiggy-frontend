@@ -146,16 +146,55 @@ function buildAddressSummaryLines(shipping: CheckoutFormValues['shipping']) {
 }
 
 function getDeliveryEstimateText(option: CheckoutShippingOption) {
-  if (option.label) {
-    return option.label
-  }
-
   if (option.deliveryEstimateText) {
-    return option.deliveryEstimateText
+    return option.deliveryEstimateText.replace(
+      /\b1 business days\b/i,
+      '1 business day',
+    )
   }
 
   if (typeof option.estimatedDays === 'number' && option.estimatedDays > 0) {
-    return `Estimated delivery in ${option.estimatedDays} business days`
+    const unit = option.estimatedDays === 1 ? 'business day' : 'business days'
+    return `Estimated delivery in ${option.estimatedDays} ${unit}`
+  }
+
+  const carrier = option.carrier.toLowerCase()
+  const service = option.service?.toLowerCase() ?? ''
+  const optionId = option.id.toLowerCase()
+  const serviceText = `${service} ${optionId}`
+
+  if (carrier.includes('usps')) {
+    if (serviceText.includes('priority_mail_express') || serviceText.includes('priority mail express')) {
+      return 'Estimated delivery in 1–3 business days'
+    }
+
+    if (serviceText.includes('ground_advantage') || serviceText.includes('ground advantage')) {
+      return 'Estimated delivery in 2–5 business days'
+    }
+
+    if (serviceText.includes('priority_mail') || serviceText.includes('priority mail')) {
+      return 'Estimated delivery in 2–3 business days'
+    }
+  }
+
+  if (carrier.includes('ups')) {
+    const upsServiceCode = serviceText.match(/\b(01|02|03|12|13|14|59)\b/)?.[1]
+
+    if (upsServiceCode === '03' || serviceText.includes('ground')) {
+      return 'Estimated delivery in 1–5 business days'
+    }
+
+    if (['01', '13', '14'].includes(upsServiceCode ?? '')) {
+      return 'Estimated delivery in 1 business day'
+    }
+
+    if (['02', '59'].includes(upsServiceCode ?? '')) {
+      return 'Estimated delivery in 2 business days'
+    }
+
+    if (upsServiceCode === '12') {
+      return 'Estimated delivery in 3 business days'
+    }
   }
 
   return 'Estimated delivery provided by carrier'
@@ -1213,7 +1252,7 @@ export default function CheckoutPage() {
       addressReadyForShipping &&
       !previousCompletion.address
     ) {
-      setActiveStep('shipping')
+      setActiveStep(hasShippingException && shippingComplete ? 'payment' : 'shipping')
       return
     }
 
@@ -1224,7 +1263,13 @@ export default function CheckoutPage() {
     ) {
       setActiveStep('payment')
     }
-  }, [activeStep, addressReadyForShipping, customerComplete, shippingComplete])
+  }, [
+    activeStep,
+    addressReadyForShipping,
+    customerComplete,
+    hasShippingException,
+    shippingComplete,
+  ])
 
   useEffect(() => {
     if (!customerComplete) {
@@ -1330,7 +1375,7 @@ export default function CheckoutPage() {
               {activeStep === 'customer'
                 ? 'Step 1 of 4. We start with the contact details.'
                 : activeStep === 'address'
-                  ? 'Step 2 of 4. As soon as the address is valid, we move to shipping.'
+                  ? 'Step 2 of 4. Once rates are ready, free shipping goes directly to payment.'
                   : activeStep === 'shipping'
                     ? 'Step 3 of 4. Pick the best rate to unlock payment.'
                     : 'Step 4 of 4. Payment is ready with Stripe.'}
