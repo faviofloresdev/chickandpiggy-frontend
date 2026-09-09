@@ -750,7 +750,7 @@ export default function CheckoutPage() {
         })
 
         placeAutocomplete.className =
-          'block w-full rounded-xl border border-input bg-transparent text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
+          'block w-full min-w-0 max-w-full rounded-xl border border-input bg-transparent text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
         placeAutocomplete.setAttribute('aria-label', 'Street address, apartment or suite')
 
         const handleInput = (event: Event) => {
@@ -1165,7 +1165,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-10 md:px-8 md:py-16">
+    <section className="mx-auto w-full max-w-6xl overflow-x-clip px-3 py-6 sm:px-6 sm:py-10 md:px-8 md:py-16">
       <div className="mb-6 text-center sm:mb-8">
         <h1 className="mb-3 text-3xl font-semibold tracking-tight text-brand-500 sm:mb-4 sm:text-4xl">
           Complete Your Purchase
@@ -1175,9 +1175,9 @@ export default function CheckoutPage() {
         </p>
       </div>
 
-      <div className="grid gap-5 sm:gap-8 lg:grid-cols-[minmax(0,1.1fr)_380px] lg:items-start">
-        <div className="order-1">
-          <div className="rounded-3xl border border-brand-200 bg-white p-4 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:rounded-[2rem] sm:p-6 md:p-8">
+      <div className="grid min-w-0 gap-5 sm:gap-8 lg:grid-cols-[minmax(0,1.1fr)_380px] lg:items-start">
+        <div className="order-1 min-w-0 max-w-full">
+          <div className="min-w-0 max-w-full rounded-3xl border border-brand-200 bg-white p-4 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:rounded-[2rem] sm:p-6 md:p-8">
             <div className="space-y-8 sm:space-y-10">
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
@@ -1243,18 +1243,19 @@ export default function CheckoutPage() {
                         aria-describedby="checkout-newsletter-description"
                         className="mt-0.5 border-brand-400 data-[state=checked]:border-brand-500 data-[state=checked]:bg-brand-500"
                       />
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1">
                         <Label
                           htmlFor="checkout-newsletter-opt-in"
                           className="cursor-pointer font-medium text-brand-800"
                         >
-                          Email me news and special updates
+                          Yes, keep me in the loop!
                         </Label>
                         <p
                           id="checkout-newsletter-description"
                           className="text-sm leading-5 text-gray-500"
                         >
-                          We will use the email above. You can unsubscribe at any time.
+                          Send me occasional Chick &amp; Piggy emails with new products,
+                          special offers, and gentle bath-time tips. Unsubscribe anytime.
                         </p>
                       </div>
                     </div>
@@ -1290,7 +1291,7 @@ export default function CheckoutPage() {
                       <div
                         id="shipping-address-line-1"
                         ref={addressAutocompleteContainerRef}
-                        className="rounded-xl border border-input bg-transparent shadow-xs focus-within:ring-[3px] focus-within:ring-ring/50"
+                        className="w-full min-w-0 max-w-full rounded-xl border border-input bg-transparent shadow-xs focus-within:ring-[3px] focus-within:ring-ring/50"
                       />
                     ) : (
                       <Input
@@ -1500,7 +1501,7 @@ export default function CheckoutPage() {
                             value={option.id}
                             className="mt-1 border-brand-500 text-brand-500"
                           />
-                          <div className="flex-1 space-y-1">
+                          <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                               <span className="min-w-0 break-words font-medium text-gray-800">
                                 {option.label ??
@@ -1629,8 +1630,8 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="order-2">
-          <div className="rounded-3xl border border-brand-200 bg-white p-4 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:rounded-[2rem] sm:p-6 lg:sticky lg:top-8">
+        <div className="order-2 min-w-0 max-w-full">
+          <div className="min-w-0 max-w-full rounded-3xl border border-brand-200 bg-white p-4 shadow-[0_20px_60px_rgba(138,112,186,0.08)] sm:rounded-[2rem] sm:p-6 lg:sticky lg:top-8">
             <h3 className="mb-4 text-xl font-semibold tracking-tight text-brand-700 sm:mb-5">
               Order Summary
             </h3>
