@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { env } from '@/lib/config/env'
+import { getCheckoutUpstreamOrigin } from '@/lib/checkout/proxy-origin'
 import { checkoutDiscountRequestSchema } from '@/lib/checkout/session'
 
 async function parseJsonResponse(response: Response) {
@@ -22,7 +23,14 @@ async function parseJsonResponse(response: Response) {
 export async function POST(request: Request) {
   try {
     const requestBody = await request.json()
-    const originHeader = request.headers.get('origin')?.trim()
+    const originHeader = getCheckoutUpstreamOrigin(request, env.siteUrl)
+
+    if (!originHeader) {
+      return NextResponse.json(
+        { error: 'We could not apply the discount.' },
+        { status: 403 }
+      )
+    }
     const payloadResult = checkoutDiscountRequestSchema.safeParse(requestBody)
 
     if (!payloadResult.success) {
@@ -41,7 +49,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         ...(env.strapiToken ? { Authorization: `Bearer ${env.strapiToken}` } : {}),
-        ...(originHeader ? { Origin: originHeader } : {}),
+        Origin: originHeader,
       },
       body: JSON.stringify(payloadResult.data),
       cache: 'no-store',

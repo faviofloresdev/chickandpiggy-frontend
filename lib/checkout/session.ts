@@ -13,8 +13,7 @@ export const checkoutCustomerSchema = z.object({
 const stateSchema = z
   .string()
   .trim()
-  .min(2, 'State is required.')
-  .max(3, 'State code is too long.')
+  .regex(/^[A-Za-z]{2}$/, 'Enter a 2-letter state code.')
   .transform((value) => value.toUpperCase())
 
 const countrySchema = z
@@ -29,7 +28,10 @@ const checkoutAddressSchema = z.object({
   addressLine2: z.string().trim().max(120, 'Address line 2 is too long.').optional(),
   city: z.string().trim().min(2, 'City is required.'),
   state: stateSchema,
-  postalCode: z.string().trim().min(3, 'Postal code is required.').max(12),
+  postalCode: z
+    .string()
+    .trim()
+    .regex(/^\d{5}(-\d{4})?$/, 'Enter a complete US ZIP code.'),
   country: countrySchema.default('US'),
 })
 
@@ -50,7 +52,7 @@ export const checkoutItemSchema = z
   .object({
     productId: z.string().trim().min(1, 'Product is required.'),
     variantId: z.string().trim().min(1).optional(),
-    quantity: z.number().int().min(1).max(99),
+    quantity: z.number().int().min(1).max(50),
     selectedOptions: z.array(checkoutSelectedOptionSchema),
   })
   .strict()
