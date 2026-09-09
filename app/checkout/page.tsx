@@ -62,7 +62,7 @@ function getPublicRequestError(
     return RATE_LIMIT_ERROR_MESSAGE
   }
 
-  if ([400, 409, 410, 422].includes(status)) {
+  if ([409, 410].includes(status)) {
     return cartChangedMessage
   }
 
@@ -388,6 +388,7 @@ export default function CheckoutPage() {
   const autocompleteCleanupRef = useRef<(() => void) | null>(null)
   const persistedOrderIdRef = useRef<number | null>(null)
   const persistedPaymentIntentIdRef = useRef<string | null>(null)
+  const quotedRequestPayloadRef = useRef<string | null>(null)
   const previousStepCompletionRef = useRef({
     customer: false,
     address: false,
@@ -516,6 +517,8 @@ export default function CheckoutPage() {
       }),
     [checkoutItemsPayload, safeShippingValues]
   )
+  const quoteMatchesCurrentAddress =
+    !!quote && quotedRequestPayloadRef.current === quoteRequestPayload
 
   function buildPaymentRequestPayload() {
     return JSON.stringify({
@@ -563,7 +566,7 @@ export default function CheckoutPage() {
   const canInitializePayment =
     !hasInvalidCartItems &&
     form.formState.isValid &&
-    !!quote &&
+    quoteMatchesCurrentAddress &&
     !!checkoutSessionToken &&
     shippingSelectionSatisfied
   const subtotal = quote?.totals.subtotal ?? getSubtotal()
@@ -599,6 +602,11 @@ export default function CheckoutPage() {
     !form.formState.errors.shipping?.city &&
     !form.formState.errors.shipping?.state &&
     !form.formState.errors.shipping?.postalCode
+  const addressReadyForShipping =
+    addressComplete &&
+    quoteMatchesCurrentAddress &&
+    !isLoadingQuote &&
+    !quoteError
   const shippingComplete =
     shippingSelectionSatisfied && (requiresShippingSelection || hasShippingException)
   const paymentReady = canInitializePayment && !!paymentSession?.clientSecret && !isLoadingPayment
@@ -744,6 +752,10 @@ export default function CheckoutPage() {
       return
     }
 
+    if (activeStep !== 'address') {
+      return
+    }
+
     const initializeAutocomplete = async () => {
       if (!addressAutocompleteContainerRef.current || !window.google?.maps?.importLibrary) {
         return
@@ -755,6 +767,12 @@ export default function CheckoutPage() {
 
       if (!PlaceAutocompleteElement) {
         setGoogleStatus('error')
+        return
+      }
+
+      const autocompleteContainer = addressAutocompleteContainerRef.current
+
+      if (!autocompleteContainer) {
         return
       }
 
@@ -838,8 +856,8 @@ export default function CheckoutPage() {
         placeAutocomplete.addEventListener('gmp-select', handleSelect as EventListener)
         placeAutocomplete.addEventListener('gmp-error', handleError)
 
-        addressAutocompleteContainerRef.current.innerHTML = ''
-        addressAutocompleteContainerRef.current.appendChild(placeAutocomplete)
+        autocompleteContainer.innerHTML = ''
+        autocompleteContainer.appendChild(placeAutocomplete)
 
         autocompleteRef.current = placeAutocomplete
         autocompleteCleanupRef.current = () => {
@@ -848,6 +866,10 @@ export default function CheckoutPage() {
           placeAutocomplete.removeEventListener('gmp-error', handleError)
         }
       } else {
+        if (autocompleteRef.current.parentElement !== autocompleteContainer) {
+          autocompleteContainer.innerHTML = ''
+          autocompleteContainer.appendChild(autocompleteRef.current)
+        }
         autocompleteRef.current.value = form.getValues('shipping.addressLine1') ?? ''
       }
 
@@ -931,6 +953,7 @@ export default function CheckoutPage() {
   }, [selectedShippingOptionId, appliedDiscountCode, customerValues, checkoutSessionToken])
 
   useEffect(() => {
+    quotedRequestPayloadRef.current = null
     setQuote(null)
     setQuoteError(null)
     setPaymentSession(null)
@@ -987,6 +1010,7 @@ export default function CheckoutPage() {
         }
 
         setQuote(nextQuote)
+        quotedRequestPayloadRef.current = quoteRequestPayload
         setAppliedDiscount(null)
         setDiscountSuccessMessage(null)
 
@@ -1008,6 +1032,7 @@ export default function CheckoutPage() {
         }
 
         setQuote(null)
+        quotedRequestPayloadRef.current = null
         setQuoteError(error instanceof Error ? error.message : CHECKOUT_ERROR_MESSAGE)
       } finally {
         if (isActive) {
@@ -1017,6 +1042,7 @@ export default function CheckoutPage() {
     }
 
     if (!canRequestQuote) {
+      quotedRequestPayloadRef.current = null
       setQuote(null)
       setQuoteError(null)
       setIsLoadingQuote(false)
@@ -1144,7 +1170,7 @@ export default function CheckoutPage() {
 
     previousStepCompletionRef.current = {
       customer: customerComplete,
-      address: addressComplete,
+      address: addressReadyForShipping,
       shipping: shippingComplete,
     }
 
@@ -1159,7 +1185,7 @@ export default function CheckoutPage() {
 
     if (
       activeStep === 'address' &&
-      addressComplete &&
+      addressReadyForShipping &&
       !previousCompletion.address
     ) {
       setActiveStep('shipping')
@@ -1173,7 +1199,7 @@ export default function CheckoutPage() {
     ) {
       setActiveStep('payment')
     }
-  }, [activeStep, addressComplete, customerComplete, shippingComplete])
+  }, [activeStep, addressReadyForShipping, customerComplete, shippingComplete])
 
   useEffect(() => {
     if (!customerComplete) {
