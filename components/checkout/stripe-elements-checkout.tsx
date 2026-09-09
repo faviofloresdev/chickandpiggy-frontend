@@ -18,6 +18,8 @@ const invalidStripePublishableKeyPatterns = [
 interface StripeElementsCheckoutProps {
   paymentSession: CheckoutPaymentIntentResponse | null
   amountLabel: string
+  customerEmail: string
+  newsletterOptIn: boolean
   isLoading: boolean
   checkoutError: string | null
   canInitialize: boolean
@@ -26,6 +28,8 @@ interface StripeElementsCheckoutProps {
 export function StripeElementsCheckout({
   paymentSession,
   amountLabel,
+  customerEmail,
+  newsletterOptIn,
   isLoading,
   checkoutError,
   canInitialize,
@@ -137,6 +141,8 @@ export function StripeElementsCheckout({
           >
             <StripePaymentForm
               amountLabel={amountLabel}
+              customerEmail={customerEmail}
+              newsletterOptIn={newsletterOptIn}
               onLoadError={(message) => setPaymentElementError(message)}
             />
           </Elements>

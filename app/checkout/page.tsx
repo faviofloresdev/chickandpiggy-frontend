@@ -26,6 +26,7 @@ import { buildCheckoutItemsPayload } from '@/lib/checkout/payload'
 import { checkoutCustomerSchema, checkoutShippingSchema } from '@/lib/checkout/session'
 import { useCartStore } from '@/lib/store/cart-store'
 import { StripeElementsCheckout } from '@/components/checkout/stripe-elements-checkout'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -417,6 +418,7 @@ export default function CheckoutPage() {
   const [paymentSession, setPaymentSession] = useState<CheckoutPaymentIntentResponse | null>(null)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [isLoadingPayment, setIsLoadingPayment] = useState(false)
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false)
   const addressLine1InputRef = useRef<HTMLInputElement | null>(null)
   const addressAutocompleteContainerRef = useRef<HTMLDivElement | null>(null)
   const autocompleteRef = useRef<any>(null)
@@ -1231,6 +1233,32 @@ export default function CheckoutPage() {
                       </p>
                     ) : null}
                   </div>
+
+                  <div className="rounded-2xl border border-brand-200 bg-brand-50 p-3 sm:col-span-2 sm:p-4">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="checkout-newsletter-opt-in"
+                        checked={newsletterOptIn}
+                        onCheckedChange={(checked) => setNewsletterOptIn(checked === true)}
+                        aria-describedby="checkout-newsletter-description"
+                        className="mt-0.5 border-brand-400 data-[state=checked]:border-brand-500 data-[state=checked]:bg-brand-500"
+                      />
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="checkout-newsletter-opt-in"
+                          className="cursor-pointer font-medium text-brand-800"
+                        >
+                          Email me news and special updates
+                        </Label>
+                        <p
+                          id="checkout-newsletter-description"
+                          className="text-sm leading-5 text-gray-500"
+                        >
+                          We will use the email above. You can unsubscribe at any time.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1590,6 +1618,8 @@ export default function CheckoutPage() {
                 <StripeElementsCheckout
                   paymentSession={paymentSession}
                   amountLabel={paymentAmountLabel}
+                  customerEmail={customerValues?.email ?? ''}
+                  newsletterOptIn={newsletterOptIn}
                   isLoading={isLoadingPayment}
                   checkoutError={paymentError}
                   canInitialize={canInitializePayment}
