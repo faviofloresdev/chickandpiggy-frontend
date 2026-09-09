@@ -1187,7 +1187,7 @@ export default function CheckoutPage() {
                   <Truck className="h-6 w-6 text-brand-500 sm:h-7 sm:w-7" />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="customer-name">Customer name</Label>
                     <Input
@@ -1282,8 +1282,8 @@ export default function CheckoutPage() {
                   rates.
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2 sm:col-span-2">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="min-w-0 space-y-2 sm:col-span-2">
                     <Label htmlFor="shipping-address-line-1">
                       Street address, apartment or suite
                     </Label>
@@ -1336,7 +1336,7 @@ export default function CheckoutPage() {
                   </div>
 
                   {googleStatus === 'ready' && addressValidated ? (
-                    <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800 sm:col-span-2">
+                    <div className="min-w-0 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800 sm:col-span-2">
                       <p className="font-medium">Selected address</p>
                       {shippingAddressSummaryLines.map((line) => (
                         <p key={line}>{line}</p>
@@ -1344,7 +1344,7 @@ export default function CheckoutPage() {
                     </div>
                   ) : null}
 
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor="shipping-city">City</Label>
                     <Input
                       id="shipping-city"
@@ -1361,7 +1361,7 @@ export default function CheckoutPage() {
                     ) : null}
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor="shipping-state">State</Label>
                     <Input
                       id="shipping-state"
@@ -1394,7 +1394,7 @@ export default function CheckoutPage() {
                     ) : null}
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor="shipping-postal-code">Postal code</Label>
                     <Input
                       id="shipping-postal-code"
@@ -1424,7 +1424,7 @@ export default function CheckoutPage() {
                     ) : null}
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor="shipping-country">Country</Label>
                     <Input
                       id="shipping-country"
@@ -1484,7 +1484,7 @@ export default function CheckoutPage() {
                           shouldValidate: true,
                         })
                       }
-                      className="space-y-3"
+                      className="min-w-0 grid-cols-1 space-y-3"
                     >
                       {availableShippingOptions.map((option) => (
                         <Label
