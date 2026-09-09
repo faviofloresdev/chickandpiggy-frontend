@@ -61,7 +61,7 @@ export function StripeElementsCheckout({
   const visibleCheckoutError = checkoutError ?? paymentElementError ?? stripeConfigError
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 max-w-full space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold tracking-tight text-brand-700 sm:text-2xl">
           Secure Payment
@@ -69,7 +69,7 @@ export function StripeElementsCheckout({
         <CreditCard className="h-6 w-6 text-brand-500 sm:h-7 sm:w-7" />
       </div>
 
-      <div className="space-y-4">
+      <div className="min-w-0 max-w-full space-y-4">
         <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3 text-sm leading-relaxed text-gray-600 sm:p-4">
           Complete your payment without leaving our website. Stripe Elements securely renders the payment fields inside this checkout.
         </div>

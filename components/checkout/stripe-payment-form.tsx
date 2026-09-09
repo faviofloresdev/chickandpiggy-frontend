@@ -84,7 +84,7 @@ export function StripePaymentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="rounded-[1.5rem] border border-brand-300 bg-brand-50 p-4">
+      <div className="min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-brand-300 bg-brand-50 p-3 sm:p-4">
         <PaymentElement
           options={{
             layout: 'tabs',
