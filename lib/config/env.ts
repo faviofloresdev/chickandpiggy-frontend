@@ -11,6 +11,9 @@ export const env = {
   siteUrl: normalizeUrl(process.env.SITE_URL) ?? DEFAULT_SITE_URL,
   strapiUrl: normalizeUrl(process.env.STRAPI_URL) ?? DEFAULT_STRAPI_URL,
   strapiToken: process.env.STRAPI_API_TOKEN,
+  adminInternalApiKey: process.env.ADMIN_INTERNAL_API_KEY,
+  adminSessionSecret: process.env.ADMIN_SESSION_SECRET,
+  adminUsersJson: process.env.ADMIN_USERS_JSON,
   strapiActiveShippingOriginPath:
     normalizeUrl(process.env.STRAPI_ACTIVE_SHIPPING_ORIGIN_PATH) ??
     'api/shipping-origins/active',
