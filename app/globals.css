@@ -163,3 +163,12 @@
     --header-height: 5.5rem;
   }
 }
+
+body:has([data-admin-shell]) > header,
+body:has([data-admin-shell]) > footer {
+  display: none;
+}
+
+body:has([data-admin-shell]) > main {
+  min-height: 100svh;
+}
