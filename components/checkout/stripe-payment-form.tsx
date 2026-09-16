@@ -88,6 +88,7 @@ export function StripePaymentForm({
         <PaymentElement
           options={{
             layout: 'tabs',
+            paymentMethodOrder: ['card', 'google_pay', 'apple_pay'],
           }}
           onLoadError={(event) => {
             const message = STRIPE_PAYMENT_LOAD_ERROR_MESSAGE
