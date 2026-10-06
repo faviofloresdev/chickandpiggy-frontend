@@ -72,7 +72,6 @@ function logFallback(scope: string, error: unknown) {
 const DEFAULT_REVALIDATE_SECONDS = 60
 const CONTENT_REVALIDATE_SECONDS = 300
 const STRAPI_URL = env.strapiUrl
-const STRAPI_TOKEN = env.strapiToken
 const PRODUCT_POPULATE_QUERY = {
   'populate[0]': 'images',
   'populate[1]': 'categories',
@@ -128,7 +127,6 @@ async function strapiFetch<T>(
     cache,
     headers: {
       Accept: 'application/json',
-      ...(STRAPI_TOKEN ? { Authorization: `Bearer ${STRAPI_TOKEN}` } : {}),
       ...headers,
     },
     next: nextOptions,
