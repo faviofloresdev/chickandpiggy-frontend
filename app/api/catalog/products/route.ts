@@ -11,5 +11,10 @@ export async function GET(request: Request) {
     limit: Number.isFinite(limit) ? limit : undefined,
   })
 
-  return NextResponse.json(result.data)
+  return NextResponse.json(result.data, {
+    headers: {
+      'X-Data-Source': result.source,
+      ...(result.error ? { 'X-Strapi-Error': result.error } : {}),
+    },
+  })
 }
