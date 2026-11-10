@@ -9,12 +9,27 @@ import { buildPageMetadata } from '@/lib/seo/metadata'
 
 export const revalidate = 300
 
-export const metadata: Metadata = buildPageMetadata({
-  title: 'Handcrafted Soaps for Everyday Care',
-  description:
-    'Discover artisan soaps and gentle self-care essentials made with thoughtfully selected ingredients.',
-  path: '/',
-})
+export async function generateMetadata(): Promise<Metadata> {
+  const [{ data: hero }, { data: global }] = await Promise.all([
+    strapiContentApi.getLandingHero(),
+    strapiContentApi.getGlobal(),
+  ])
+  const cmsTitle = hero.metaTitle?.trim() || global.defaultSeo?.metaTitle?.trim()
+  const metadata = buildPageMetadata({
+    title: cmsTitle || 'Handcrafted Soaps for Kids',
+    description:
+      hero.metaDescription?.trim() || global.defaultSeo?.metaDescription?.trim() ||
+      'Discover handcrafted soaps for kids and thoughtful gift sets, inspired by our little ones and made with love for yours.',
+    image: hero.ogImage || global.defaultSeo?.shareImage,
+    path: '/',
+  })
+
+  return {
+    ...metadata,
+    // CMS titles are complete; keep the layout from adding the brand again.
+    title: cmsTitle ? { absolute: cmsTitle } : metadata.title,
+  }
+}
 
 export default async function HomePage() {
   const contactInfo = await strapiContentApi
