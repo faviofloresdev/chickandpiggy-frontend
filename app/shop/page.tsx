@@ -314,9 +314,9 @@ export async function generateMetadata({
   const hasFilteringParams = Object.keys(resolvedSearchParams).length > 0
 
   return buildPageMetadata({
-    title: 'Shop Handmade Soaps for Kids',
+    title: 'Shop Artisan Soaps',
     description:
-      'Shop handcrafted soaps for kids and thoughtful gift sets. Discover playful shapes and little favorites, made with love for family bath-time moments.',
+      'Browse handcrafted soaps and artisan self-care products made for gentle, everyday routines.',
     path: '/shop',
     noIndex: hasFilteringParams,
   })
@@ -402,13 +402,8 @@ export default async function ShopPage({
             <span className="font-medium text-gray-900">Shop</span>
           </div>
           <h1 className="text-4xl font-semibold tracking-tight text-brand-500">
-            Handcrafted soaps for little smiles
+            Our Shop
           </h1>
-          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-gray-600">
-            From playful little soaps to thoughtful gift sets, find a favorite for your
-            family’s bath-time moments. Each one is handcrafted with love, inspired by
-            our little ones.
-          </p>
         </div>
       </div>
 
@@ -564,7 +559,7 @@ export default async function ShopPage({
                 href="/shop"
                 className="rounded-full border border-gray-200 px-5 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900"
               >
-                Clear filters
+                Reset
               </Link>
             </div>
           </form>
@@ -595,8 +590,7 @@ export default async function ShopPage({
             </div>
           ) : (
             <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 px-8 py-16 text-center text-gray-500">
-              No little favorites found just yet. Try different filters or clear them
-              to explore the collection.
+              No products matched the selected filters.
             </div>
           )}
 
