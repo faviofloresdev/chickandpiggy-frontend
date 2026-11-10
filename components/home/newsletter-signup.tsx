@@ -63,17 +63,17 @@ export function NewsletterSignup({ contactEmail }: NewsletterSignupProps) {
       <div className="mx-auto max-w-7xl rounded-[2rem] bg-brand-75 px-6 py-12 md:px-12 md:py-14">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight text-brand-500 md:text-4xl">
-            Stay in touch
+            A little note from Chick and Piggy
           </h2>
           <p className="mt-4 text-xl font-serif text-brand-700/80 md:text-2xl">
-            Subscribe for content, soft updates, and brand news.
+            Get new soap arrivals, little stories, and news from our family to yours.
           </p>
 
           {submitted ? (
             <div className="mx-auto mt-8 max-w-xl rounded-[1.5rem] bg-white px-6 py-6 text-center">
-              <p className="text-base font-semibold text-brand-500">Subscription received.</p>
+              <p className="text-base font-semibold text-brand-500">You’re on the list!</p>
               <p className="mt-2 text-sm leading-6 text-gray-500">
-                We will use your email to share news and content.
+                Thanks for joining our little corner. We’ll be in touch with news from Chick and Piggy.
               </p>
             </div>
           ) : (
@@ -88,7 +88,7 @@ export function NewsletterSignup({ contactEmail }: NewsletterSignupProps) {
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
+                placeholder="Your email address"
                 className="h-12 rounded-full border-white bg-white px-5 text-brand-800 placeholder:text-gray-400"
               />
               <Button
@@ -96,7 +96,7 @@ export function NewsletterSignup({ contactEmail }: NewsletterSignupProps) {
                 disabled={isSubmitting}
                 className="h-12 rounded-full bg-brand-400 px-6 text-white shadow-sm hover:bg-brand-450 md:min-w-40"
               >
-                {isSubmitting ? 'Subscribing...' : 'Subscribe'}
+                {isSubmitting ? 'Subscribing...' : 'Keep me in the loop'}
               </Button>
             </form>
           )}
