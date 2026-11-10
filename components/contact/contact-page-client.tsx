@@ -67,11 +67,10 @@ export function ContactPageClient({
     <section className="max-w-7xl mx-auto px-6 md:px-12 py-16 md:py-24">
       <div className="text-center mb-16">
         <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-brand-500 mb-4">
-          Say hello to Chick and Piggy
+          Contact Us
         </h1>
         <p className="text-xl md:text-2xl text-gray-500 font-serif">
-          A little question or a special request? From choosing a soap to checking
-          on your order, we are here to help.
+          We are here to help. Write to us and we will get back to you soon.
         </p>
       </div>
 
@@ -79,7 +78,7 @@ export function ContactPageClient({
         <div className="flex-1 space-y-12">
           <div>
             <h3 className="text-2xl font-semibold tracking-tight text-brand-700 mb-8">
-              Let’s stay in touch
+              Contact Information
             </h3>
             <div className="space-y-6">
               {contactInfo.contactEmail ? (
@@ -87,11 +86,11 @@ export function ContactPageClient({
                   <div className="w-12 h-12 bg-brand-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm">
                     <Mail strokeWidth={1.5} />
                   </div>
-                  <div className="min-w-0 pt-1">
+                  <div className="pt-1">
                     <p className="font-medium text-gray-800 text-lg">Email</p>
                     <a
                       href={`mailto:${contactInfo.contactEmail}`}
-                      className="break-words text-gray-500 hover:text-brand-500 transition-colors"
+                      className="text-gray-500 hover:text-brand-500 transition-colors"
                     >
                       {contactInfo.contactEmail}
                     </a>
@@ -139,7 +138,7 @@ export function ContactPageClient({
         <div className="flex-1 w-full max-w-lg mx-auto md:max-w-none">
           <div className="bg-white p-8 md:p-12 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.05)] border border-gray-50">
             <h3 className="text-2xl font-semibold tracking-tight text-brand-700 mb-8">
-              Leave us a little note
+              Send us a message
             </h3>
 
             {submitted ? (
@@ -148,10 +147,10 @@ export function ContactPageClient({
                   <Send className="text-success-500 w-8 h-8" />
                 </div>
                 <h4 className="text-xl font-semibold text-gray-800 mb-2">
-                  Thanks for saying hello!
+                  Message sent!
                 </h4>
                 <p className="text-gray-500">
-                  Your message is on its way to us. We’ll be in touch as soon as we can.
+                  We will get back to you as soon as possible.
                 </p>
               </div>
             ) : (
@@ -165,7 +164,7 @@ export function ContactPageClient({
                     type="text"
                     required
                     className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-shadow bg-gray-50/50 text-gray-800"
-                    placeholder="Your name"
+                    placeholder="e.g. John Smith"
                   />
                 </div>
                 <div>
@@ -177,7 +176,7 @@ export function ContactPageClient({
                     type="email"
                     required
                     className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-shadow bg-gray-50/50 text-gray-800"
-                    placeholder="you@example.com"
+                    placeholder="john@email.com"
                   />
                 </div>
                 <div>
@@ -189,7 +188,7 @@ export function ContactPageClient({
                     rows={4}
                     required
                     className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-shadow resize-none bg-gray-50/50 text-gray-800"
-                    placeholder="Tell us how we can help you and your little ones."
+                    placeholder="How can we help you?"
                   />
                 </div>
                 {submitError ? (

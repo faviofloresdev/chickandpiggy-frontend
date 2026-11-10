@@ -9,9 +9,9 @@ import { buildFaqSchema } from '@/lib/seo/schema'
 export const revalidate = 300
 
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Handcrafted Soap FAQs',
+  title: 'Frequently Asked Questions',
   description:
-    'A little help before bath time: find answers about our handcrafted soaps, ingredients, shipping, special orders, and how to care for your soap.',
+    'Find quick answers about products, ingredients, shipping, and ordering from Chick & Piggy.',
   path: '/faq',
 })
 
@@ -22,13 +22,9 @@ export default async function FaqPage() {
   return (
     <section className="max-w-3xl mx-auto px-6 md:px-12 py-16 md:py-24">
       <JsonLd data={faqSchema} />
-      <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-brand-500 mb-4 text-center">
+      <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-brand-500 mb-12 text-center">
         Frequently Asked Questions
       </h1>
-      <p className="mb-12 text-center text-lg leading-relaxed text-gray-500">
-        A little help for you and your little ones. Find answers about our soaps,
-        your order, and making the most of bath time.
-      </p>
       <div className="space-y-6">
         {faqs.map((faq) => (
           <details key={faq.id} className="group border-b border-gray-200 pb-6">
