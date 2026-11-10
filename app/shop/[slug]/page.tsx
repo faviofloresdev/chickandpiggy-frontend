@@ -44,7 +44,7 @@ export async function generateMetadata({
     })
   }
 
-  return buildPageMetadata({
+  const metadata = buildPageMetadata({
     title: product.metaTitle || product.name,
     description:
       product.metaDescription ||
@@ -54,6 +54,11 @@ export async function generateMetadata({
     image: product.ogImage || product.image,
     type: 'article',
   })
+
+  return {
+    ...metadata,
+    title: product.metaTitle ? { absolute: product.metaTitle } : metadata.title,
+  }
 }
 
 export default async function ProductPage({

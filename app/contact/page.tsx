@@ -7,9 +7,9 @@ import { buildPageMetadata } from '@/lib/seo/metadata'
 export const revalidate = 300
 
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Contact Chick & Piggy',
+  title: 'Contact & Order Help',
   description:
-    'Get in touch with Chick & Piggy for product questions, shipping support, and order help.',
+    'A little question? We are here to help. Contact Chick and Piggy about our handcrafted soaps, your order, shipping, or a special gift for your little one.',
   path: '/contact',
 })
 
